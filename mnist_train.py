@@ -128,11 +128,15 @@ for i in range(training_epochs):
     
     print('epoch ' + str(i) + ": test-missed: " + str(test_missed) + " MSE: " + str(test_mse) + " percent missed: " + str(test_missed_percent) + " train percent missed: " + str(train_missed_percent));
     #f_out.write(str(train_mse) + "," + str(train_missed_percent) + "," + str(test_missed_percent) + "\n")
-    if(time.time() - save_time > save_interval):
+    if(time.time() - save_time > save_interval or i == training_epochs-1):
         print('saving results...')
         f_handle = h5py.File(p['results_dir'] + p['simname'] + p['version'] + '.h5py','w')
         f_handle['train_mse_list'] = np.array(train_mse_list);
+        f_handle['train_missed_list'] = np.array(train_missed_list);
         f_handle['train_missed_percent_list'] = np.array(train_missed_percent_list);
+        f_handle['test_mse_list'] = np.array(test_mse_list);
+        f_handle['test_missed_list'] = np.array(test_missed_list);
+        f_handle['test_missed_percent_list'] = np.array(test_missed_percent_list);
         
         #iterate through all parameters and save them in the parameters group
         p_group = f_handle.create_group('parameters');
