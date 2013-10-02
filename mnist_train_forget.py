@@ -1,23 +1,29 @@
 import numpy as np
 from mnist_numpy import read_mnist
 from nnet_toolkit import nnet
+from autoconvert import autoconvert
 import sys
 import time
 
 #h5py used for saving results to a file
 import h5py
 
-
 #Get the parameters file from the command line
 #use mnist_train_params.py by default (no argument given)
 if(len(sys.argv) > 1):
-    params_file = sys.argv[1];
+    params_file = sys.argv[1]
 else:
     params_file = 'mnist_train_forget_params.py'
     
 p = {}
-execfile(params_file,p);
+execfile(params_file,p)
 
+#grab extra parameters from command line
+for i in range(2,len(sys.argv)+1):
+    (k,v) = sys.argv[i].split()
+    p[k] = autoconvert(v)
+    print(str(k) + ":" + str(v))
+    
 def load_data(digits,dataset,p):
     images, labels = read_mnist(digits,dataset,path=p['data_dir']);
     labels = labels.transpose()[0] #put labels in an array
