@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 import numpy as np
 from mnist_numpy import read_mnist
 from nnet_toolkit import nnet
@@ -19,8 +20,8 @@ p = {}
 execfile(params_file,p)
 
 #grab extra parameters from command line
-for i in range(2,len(sys.argv)+1):
-    (k,v) = sys.argv[i].split()
+for i in range(2,len(sys.argv)):
+    (k,v) = sys.argv[i].split('=')
     p[k] = autoconvert(v)
     print(str(k) + ":" + str(v))
     
