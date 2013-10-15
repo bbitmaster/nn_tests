@@ -10,13 +10,21 @@ results_dir = '../results/'
 data_dir = '../data/'
 
 num_hidden = 300
+num_hidden2 = 300; #use -1 for no 2nd hidden layer
+
+activation_function='tanh'
+activation_function2='tanh'
+
 learning_rate = .01
 training_epochs = 3000
 
-forget_epoch = 10
+forget_epoch = 1000
 
-num_selected_neurons=150
-select_func = None
+num_selected_neurons=100
+select_func = sf.most_negative_select_func
+
+num_selected_neurons2=100
+select_func2 = sf.most_negative_select_func
 
 random_seed = 4;
 

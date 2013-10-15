@@ -55,7 +55,20 @@ training_epochs = p['training_epochs']
 
 minibatch_size = 128;
 
-layers = [nnet.layer(28*28),nnet.layer(num_hidden,'tanh',select_func=p['select_func'],select_func_params=p['num_selected_neurons']),nnet.layer(10,'tanh')]
+#layers = [nnet.layer(28*28),
+#          nnet.layer(num_hidden,'tanh',select_func=p['select_func'],select_func_params=p['num_selected_neurons']),
+#          nnet.layer(10,'tanh')]
+
+layers = [];
+layers.append(nnet.layer(28*28))
+layers.append(nnet.layer(p['num_hidden'],p['activation_function'],select_func=p['select_func'],select_func_params=p['num_selected_neurons']))
+
+#Add 2nd and 3rd hidden layers if there are parameters indicating that we should
+if(p.has_key('num_hidden2')):
+    layers.append(nnet.layer(p['num_hidden2'],p['activation_function2'],select_func=p['select_func2'],select_func_params=p['num_selected_neurons2']))
+if(p.has_key('num_hidden3')):
+    layers.append(nnet.layer(p['num_hidden3'],p['activation_function3'],select_func=p['select_func3'],select_func_params=p['num_selected_neurons3']))
+layers.append(nnet.layer(10,'tanh'))
 
 learning_rate = p['learning_rate']
 
