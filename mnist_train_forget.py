@@ -2,6 +2,7 @@
 import numpy as np
 from mnist_numpy import read_mnist
 from nnet_toolkit import nnet
+from nnet_toolkit import select_funcs as sf
 from autoconvert import autoconvert
 import sys
 import time
@@ -22,7 +23,24 @@ execfile(params_file,p)
 #grab extra parameters from command line
 for i in range(2,len(sys.argv)):
     (k,v) = sys.argv[i].split('=')
-    p[k] = autoconvert(v)
+    v = autoconvert(v)
+    if(v == 'minabs'):
+        v = sf.minabs_select_func
+    elif(v == 'maxabs'):
+        v = sf.maxabs_select_func
+    elif(v == 'most_negative'):
+        v = sf.most_negative_select_func
+    elif(v == 'most_positive'):
+        v = sf.most_positive_select_func
+    elif(v == 'minabs_normalized'):
+        v = sf.minabs_normalized_select_func
+    elif(v == 'maxabs_normalized'):
+        v = sf.maxabs_normalized_select_func
+    elif(v == 'most_negative_normalized'):
+        v = sf.most_negative_normalized_select_func
+    elif(v == 'most_positive_normalized'):
+        v = sf.most_positive_normalized_select_func
+    p[k] = v
     print(str(k) + ":" + str(v))
     
 def load_data(digits,dataset,p):
