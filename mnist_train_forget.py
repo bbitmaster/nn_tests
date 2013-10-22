@@ -11,7 +11,7 @@ import time
 import h5py
 
 #Get the parameters file from the command line
-#use mnist_train_params.py by default (no argument given)
+#use mnist_train__forget_params.py by default (no argument given)
 if(len(sys.argv) > 1):
     params_file = sys.argv[1]
 else:
@@ -58,6 +58,7 @@ def load_data(digits,dataset,p):
 
     #build classification data in the form of neuron outputs
     class_data = np.zeros((labels.shape[0],10))
+    #class_data = np.ones((labels.shape[0],10))*-1.0
     for i in range(labels.shape[0]):
         class_data[i,labels[i]] = 1.0;
     return (sample_data,class_data)
