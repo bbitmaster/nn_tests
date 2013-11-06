@@ -57,22 +57,23 @@ def load_data(digits,dataset,p):
     sample_data = images.reshape(train_size,28*28)
 
     #build classification data in the form of neuron outputs
-    class_data = np.ones((labels.shape[0],10))*p['incorrect_target']
+    #class_data = np.zeros((labels.shape[0],10))
+    class_data = np.ones((labels.shape[0],10))*-1.0
     for i in range(labels.shape[0]):
-        class_data[i,labels[i]] = p['correct_target'];
+        class_data[i,labels[i]] = 1.0;
     return (sample_data,class_data)
 
 (sample_data,class_data) = load_data(range(10),"training",p)
 train_size = sample_data.shape[0]
 
-(test_data,test_class) = load_data(range(10),"testing",p)
-test_size = test_data.shape[0]
+#(test_data,test_class) = load_data(range(10),"testing",p)
+#test_size = test_data.shape[0]
 
 num_hidden = p['num_hidden']
 
 training_epochs = p['training_epochs']
 
-minibatch_size = p['minibatch_size'];
+minibatch_size = p['minibatch_size']
 
 #layers = [nnet.layer(28*28),
 #          nnet.layer(num_hidden,'tanh',select_func=p['select_func'],select_func_params=p['num_selected_neurons']),
@@ -80,28 +81,14 @@ minibatch_size = p['minibatch_size'];
 
 layers = [];
 layers.append(nnet.layer(28*28))
-layers.append(nnet.layer(p['num_hidden'],p['activation_function'],select_func=p['select_func'],
-                         select_func_params=p['num_selected_neurons'],
-                         initialization_scheme=p['initialization_scheme'],
-                         initialization_constant=p['initialization_constant'],
-                         dropout=p['dropout']))
+layers.append(nnet.layer(p['num_hidden'],p['activation_function'],select_func=p['select_func'],select_func_params=p['num_selected_neurons']))
 
 #Add 2nd and 3rd hidden layers if there are parameters indicating that we should
 if(p.has_key('num_hidden2')):
-    layers.append(nnet.layer(p['num_hidden2'],p['activation_function2'],select_func=p['select_func2'],
-                             select_func_params=p['num_selected_neurons2'],
-                             initialization_scheme=p['initialization_scheme2'],
-                             initialization_constant=p['initialization_constant2'],
-                             dropout=p['dropout2']))
-
+    layers.append(nnet.layer(p['num_hidden2'],p['activation_function2'],select_func=p['select_func2'],select_func_params=p['num_selected_neurons2']))
 if(p.has_key('num_hidden3')):
-    layers.append(nnet.layer(p['num_hidden3'],p['activation_function3'],select_func=p['select_func3'],
-                             select_func_params=p['num_selected_neurons3'],
-                             initialization_scheme=p['initialization_scheme3'],
-                             initialization_constant=p['initialization_constant3'],
-                             dropout=p['dropout3']))
-                             
-layers.append(nnet.layer(10,p['activation_function_final']))
+    layers.append(nnet.layer(p['num_hidden3'],p['activation_function3'],select_func=p['select_func3'],select_func_params=p['num_selected_neurons3']))
+layers.append(nnet.layer(5,p['activation_function_final']))
 
 learning_rate = p['learning_rate']
 
@@ -120,18 +107,44 @@ save_time = time.time()
 train_mse_list = [];
 train_missed_list = [];
 train_missed_percent_list = [];
-test_mse_list = [];
-test_missed_list = [];
-test_missed_percent_list = [];
+test_mse_list1 = [];
+test_missed_list1 = [];
+test_missed_percent_list1 = [];
+test_mse_list2 = [];
+test_missed_list2 = [];
+test_missed_percent_list2 = [];
+
+shuffle_rate = p['shuffle_rate'];
+
+train_set_to_use = 0
+(sample_data1,class_data1) = load_data(range(5),"training",p);
+(sample_data2,class_data2) = load_data(range(5,10),"training",p);
+(test_data1,test_class1) = load_data(range(5),"testing",p);
+(test_data2,test_class2) = load_data(range(5,10),"testing",p);
+test_size1 = test_data1.shape[0]
+test_size2 = test_data2.shape[0]
+test_class1 = np.transpose(test_class1)
+test_class2 = np.transpose(test_class2)
+test_class1 = test_class1[0:5,:]
+test_class2 = test_class2[5:10,:]
+
 
 for i in range(training_epochs):
-    
     #This is the forgetting test. If the epoch == forget epoch, then we want to switch the training dataset so that it only gets digits 0-5
-    if(i == p['forget_epoch']):
-        print('forget epoch - switching training data.')
-        (sample_data,class_data) = load_data(range(5),"training",p)
+#    if(i == p['forget_epoch']):
+#        print('forget epoch - switching training data.')
+#        (sample_data,class_data) = load_data(range(5),"training",p)
+#        train_size = sample_data.shape[0]
+    if(not (i%shuffle_rate)):
+        print('shuffling to ' + str(train_set_to_use));
+        if(train_set_to_use == 0):
+            (sample_data,class_data) = (sample_data1,class_data1)
+            train_set_to_use = 1
+        elif(train_set_to_use == 1):
+            (sample_data,class_data) = (sample_data2,class_data2)
+            train_set_to_use = 0
         train_size = sample_data.shape[0]
-        
+
     minibatch_count = int(train_size/minibatch_size)
     
     #shuffle data
@@ -146,7 +159,11 @@ for i in range(training_epochs):
     for j in range(minibatch_count+1):
         #grab a minibatch
         net.input = np.transpose(sample_data[j*minibatch_size:(j+1)*minibatch_size])
-        classification = np.transpose(class_data[j*minibatch_size:(j+1)*minibatch_size])
+        classification = np.transpose(class_data[j*minibatch_size:(j+1)*minibatch_size]) 
+        if(train_set_to_use == 1):
+            classification = classification[0:5,:]
+        if(train_set_to_use == 0):
+            classification = classification[5:10,:]
         net.feed_forward()
         net.error = net.output - classification
         guess = np.argmax(net.output,0)
@@ -157,26 +174,40 @@ for i in range(training_epochs):
         net.update_weights()
     train_missed_percent = float(train_missed)/float(train_size)
     
-    #feed test set through to get test rates
-    net.train=False
-    net.input = np.transpose(test_data)
+    #feed test set through to get test 1 rates
+    net.input = np.transpose(test_data1)
     net.feed_forward()
-    test_guess = np.argmax(net.output,0)
-    c = np.argmax(np.transpose(test_class),0)
-    test_missed = np.sum(c != test_guess)
-    test_mse = np.sum(net.error**2)
-    test_missed_percent = float(test_missed)/float(test_size)
-    net.train=True
+    test_guess1 = np.argmax(net.output,0)
+    c = np.argmax(test_class1,0)
+    test_missed1 = np.sum(c != test_guess1)
+    test_mse1 = np.sum(net.error**2)
+    test_missed_percent1 = float(test_missed1)/float(test_size1)
+
+	#feed test set through to get test 2 rates
+    net.input = np.transpose(test_data2)
+    net.feed_forward()
+    test_guess2 = np.argmax(net.output,0)
+    c = np.argmax(test_class2,0)
+    test_missed2 = np.sum(c != test_guess2)
+    test_mse2 = np.sum(net.error**2)
+    test_missed_percent2 = float(test_missed2)/float(test_size2)
     
     #log everything for saving
     train_mse_list.append(train_mse)
     train_missed_list.append(train_missed)
     train_missed_percent_list.append(train_missed_percent)
-    test_mse_list.append(test_mse)
-    test_missed_list.append(test_missed)
-    test_missed_percent_list.append(test_missed_percent)
     
-    print('epoch ' + str(i) + ": test-missed: " + str(test_missed) + " MSE: " + str(test_mse) + " percent missed: " + str(test_missed_percent) + " train percent missed: " + str(train_missed_percent));
+	#test rate 1 and 2
+    test_mse_list1.append(test_mse1)
+    test_missed_list1.append(test_missed1)
+    test_missed_percent_list1.append(test_missed_percent1)
+    test_mse_list2.append(test_mse2)
+    test_missed_list2.append(test_missed2)
+    test_missed_percent_list2.append(test_missed_percent2)
+    
+    print('epoch ' + str(i) + ": test-missed1: " + str(test_missed1) + " MSE1: " + str(test_mse1) + " percent missed1: " + str(test_missed_percent1) + " train percent missed: " + str(train_missed_percent));
+    print('epoch ' + str(i) + ": test-missed2: " + str(test_missed2) + " MSE2: " + str(test_mse2) + " percent missed2: " + str(test_missed_percent2));
+
     #f_out.write(str(train_mse) + "," + str(train_missed_percent) + "," + str(test_missed_percent) + "\n")
     if(time.time() - save_time > save_interval or i == training_epochs-1):
         print('saving results...')
@@ -184,9 +215,13 @@ for i in range(training_epochs):
         f_handle['train_mse_list'] = np.array(train_mse_list);
         f_handle['train_missed_list'] = np.array(train_missed_list);
         f_handle['train_missed_percent_list'] = np.array(train_missed_percent_list);
-        f_handle['test_mse_list'] = np.array(test_mse_list);
-        f_handle['test_missed_list'] = np.array(test_missed_list);
-        f_handle['test_missed_percent_list'] = np.array(test_missed_percent_list);
+        
+        f_handle['test_mse_list1'] = np.array(test_mse_list1);
+        f_handle['test_missed_list1'] = np.array(test_missed_list1);
+        f_handle['test_missed_percent_list1'] = np.array(test_missed_percent_list1);
+        f_handle['test_mse_list2'] = np.array(test_mse_list2);
+        f_handle['test_missed_list2'] = np.array(test_missed_list2);
+        f_handle['test_missed_percent_list2'] = np.array(test_missed_percent_list2);
         
         #iterate through all parameters and save them in the parameters group
         p_group = f_handle.create_group('parameters');
