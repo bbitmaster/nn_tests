@@ -15,7 +15,7 @@ import h5py
 if(len(sys.argv) > 1):
     params_file = sys.argv[1]
 else:
-    params_file = 'mnist_train_forget_params.py'
+    params_file = 'mnist_train_nonstationary_params.py'
     
 p = {}
 execfile(params_file,p)
@@ -57,8 +57,7 @@ def load_data(digits,dataset,p):
     sample_data = images.reshape(train_size,28*28)
 
     #build classification data in the form of neuron outputs
-    #class_data = np.zeros((labels.shape[0],10))
-    class_data = np.ones((labels.shape[0],10))*-1.0
+    class_data = np.ones((labels.shape[0],10))*p['incorrect_target']
     for i in range(labels.shape[0]):
         class_data[i,labels[i]] = 1.0;
     return (sample_data,class_data)
@@ -75,19 +74,33 @@ training_epochs = p['training_epochs']
 
 minibatch_size = p['minibatch_size']
 
-#layers = [nnet.layer(28*28),
-#          nnet.layer(num_hidden,'tanh',select_func=p['select_func'],select_func_params=p['num_selected_neurons']),
-#          nnet.layer(10,'tanh')]
 
 layers = [];
 layers.append(nnet.layer(28*28))
-layers.append(nnet.layer(p['num_hidden'],p['activation_function'],select_func=p['select_func'],select_func_params=p['num_selected_neurons']))
+layers.append(nnet.layer(p['num_hidden'],p['activation_function'],select_func=p['select_func'],
+                         select_func_params=p['num_selected_neurons'],
+                         initialization_scheme=p['initialization_scheme'],
+                         initialization_constant=p['initialization_constant'],
+                         dropout=p['dropout'],sparse_penalty=p['sparse_penalty'],
+                         sparse_target=p['sparse_target']))
 
 #Add 2nd and 3rd hidden layers if there are parameters indicating that we should
 if(p.has_key('num_hidden2')):
-    layers.append(nnet.layer(p['num_hidden2'],p['activation_function2'],select_func=p['select_func2'],select_func_params=p['num_selected_neurons2']))
+    layers.append(nnet.layer(p['num_hidden2'],p['activation_function2'],select_func=p['select_func2'],
+                             select_func_params=p['num_selected_neurons2'],
+                             initialization_scheme=p['initialization_scheme2'],
+                             initialization_constant=p['initialization_constant2'],
+                             dropout=p['dropout2'],sparse_penalty=p['sparse_penalty2'],
+                             sparse_target=p['sparse_target2']))
+
 if(p.has_key('num_hidden3')):
-    layers.append(nnet.layer(p['num_hidden3'],p['activation_function3'],select_func=p['select_func3'],select_func_params=p['num_selected_neurons3']))
+    layers.append(nnet.layer(p['num_hidden3'],p['activation_function3'],select_func=p['select_func3'],
+                             select_func_params=p['num_selected_neurons3'],
+                             initialization_scheme=p['initialization_scheme3'],
+                             initialization_constant=p['initialization_constant3'],
+                             dropout=p['dropout3'],sparse_penalty=p['sparse_penalty3'],
+                             sparse_target=p['sparse_target3']))
+                             
 layers.append(nnet.layer(5,p['activation_function_final']))
 
 learning_rate = p['learning_rate']
@@ -128,20 +141,29 @@ test_class2 = np.transpose(test_class2)
 test_class1 = test_class1[0:5,:]
 test_class2 = test_class2[5:10,:]
 
+do_weight_restoration = p['do_weight_restoration']
 
+#save output layer weights for reinitializing
+if do_weight_restoration:
+    outweights1 = np.copy(net.layer[-1].weights)
+    outweights2 = np.copy(net.layer[-1].weights)
+    
 for i in range(training_epochs):
-    #This is the forgetting test. If the epoch == forget epoch, then we want to switch the training dataset so that it only gets digits 0-5
-#    if(i == p['forget_epoch']):
-#        print('forget epoch - switching training data.')
-#        (sample_data,class_data) = load_data(range(5),"training",p)
-#        train_size = sample_data.shape[0]
     if(not (i%shuffle_rate)):
         print('shuffling to ' + str(train_set_to_use));
         if(train_set_to_use == 0):
             (sample_data,class_data) = (sample_data1,class_data1)
+            if do_weight_restoration:
+                print("restoring output weights to P1")
+                outweights2 = np.copy(net.layer[-1].weights)
+                net.layer[-1].weights = np.copy(outweights1)
             train_set_to_use = 1
         elif(train_set_to_use == 1):
             (sample_data,class_data) = (sample_data2,class_data2)
+            if do_weight_restoration:
+                print("restoring output weights to P2")
+                outweights1 = np.copy(net.layer[-1].weights)
+                net.layer[-1].weights = np.copy(outweights2)
             train_set_to_use = 0
         train_size = sample_data.shape[0]
 
@@ -173,6 +195,10 @@ for i in range(training_epochs):
         net.back_propagate()
         net.update_weights()
     train_missed_percent = float(train_missed)/float(train_size)
+
+    if do_weight_restoration:
+        tmpweights = np.copy(net.layer[-1].weights)
+        net.layer[-1].weights = np.copy(outweights1)
     
     #feed test set through to get test 1 rates
     net.input = np.transpose(test_data1)
@@ -191,6 +217,9 @@ for i in range(training_epochs):
     test_missed2 = np.sum(c != test_guess2)
     test_mse2 = np.sum(net.error**2)
     test_missed_percent2 = float(test_missed2)/float(test_size2)
+    
+    if do_weight_restoration:
+        net.layer[-1].weights = tmpweights
     
     #log everything for saving
     train_mse_list.append(train_mse)
