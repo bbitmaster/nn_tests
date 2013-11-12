@@ -9,11 +9,27 @@ results_dir = '../results/'
 
 data_dir = '../data/'
 
-num_hidden = 300
-num_hidden2 = 300; #use -1 for no 2nd hidden layer
+incorrect_target = 0.0
+correct_target = 1.0
 
-activation_function='tanh'
+num_hidden = 800
+num_hidden2 = 300;
+
+activation_function='sigmoid'
 activation_function2='tanh'
+activation_function_final='softmax'
+
+sparse_penalty=0.01
+sparse_target=0.05
+
+sparse_penalty2=None
+sparse_target2=None
+
+
+#sparse_penalty=None
+#sparse_target=None
+
+minibatch_size=128
 
 learning_rate = .01
 training_epochs = 3000
@@ -21,10 +37,25 @@ training_epochs = 3000
 forget_epoch = 1000
 
 num_selected_neurons=100
-select_func = sf.most_negative_select_func
+select_func = None
 
-num_selected_neurons2=100
-select_func2 = sf.most_negative_select_func
+num_selected_neurons2=150
+select_func2 = sf.most_positive_select_func
+
+num_selected_neurons3=150
+select_func3 = None
+
+dropout=0.5
+dropout2=0.5
+dropout3=None
+
+initialization_scheme='glorot'
+initialization_scheme2='glorot'
+initialization_scheme3='glorot'
+
+initialization_constant=1.0
+initialization_constant2=1.0
+initialization_constant3=1.0
 
 random_seed = 4;
 

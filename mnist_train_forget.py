@@ -72,7 +72,7 @@ num_hidden = p['num_hidden']
 
 training_epochs = p['training_epochs']
 
-minibatch_size = p['minibatch_size'];
+minibatch_size = p['minibatch_size']
 
 #layers = [nnet.layer(28*28),
 #          nnet.layer(num_hidden,'tanh',select_func=p['select_func'],select_func_params=p['num_selected_neurons']),
@@ -84,7 +84,8 @@ layers.append(nnet.layer(p['num_hidden'],p['activation_function'],select_func=p[
                          select_func_params=p['num_selected_neurons'],
                          initialization_scheme=p['initialization_scheme'],
                          initialization_constant=p['initialization_constant'],
-                         dropout=p['dropout']))
+                         dropout=p['dropout'],sparse_penalty=p['sparse_penalty'],
+                         sparse_target=p['sparse_target']))
 
 #Add 2nd and 3rd hidden layers if there are parameters indicating that we should
 if(p.has_key('num_hidden2')):
@@ -92,14 +93,16 @@ if(p.has_key('num_hidden2')):
                              select_func_params=p['num_selected_neurons2'],
                              initialization_scheme=p['initialization_scheme2'],
                              initialization_constant=p['initialization_constant2'],
-                             dropout=p['dropout2']))
+                             dropout=p['dropout2'],sparse_penalty=p['sparse_penalty2'],
+                             sparse_target=p['sparse_target2']))
 
 if(p.has_key('num_hidden3')):
     layers.append(nnet.layer(p['num_hidden3'],p['activation_function3'],select_func=p['select_func3'],
                              select_func_params=p['num_selected_neurons3'],
                              initialization_scheme=p['initialization_scheme3'],
                              initialization_constant=p['initialization_constant3'],
-                             dropout=p['dropout3']))
+                             dropout=p['dropout3'],sparse_penalty=p['sparse_penalty3'],
+                             sparse_target=p['sparse_target3']))
                              
 layers.append(nnet.layer(10,p['activation_function_final']))
 
