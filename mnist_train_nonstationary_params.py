@@ -12,9 +12,9 @@ data_dir = '../data/'
 incorrect_target = 0.0
 correct_target = 1.0
 
-num_hidden = 1000
-num_hidden2 = 1000
-num_hidden2 = 1000
+num_hidden = 500
+num_hidden2 = 500
+num_hidden3 = 500
 
 activation_function='linear_rectifier'
 activation_function2='linear_rectifier'
@@ -27,8 +27,8 @@ sparse_target=None
 sparse_penalty2=None
 sparse_target2=None
 
-#sparse_penalty=None
-#sparse_target=None
+sparse_penalty3=None
+sparse_target3=None
 
 minibatch_size=128
 
@@ -36,13 +36,14 @@ learning_rate = .01
 training_epochs = 3000
 
 do_weight_restoration = True
-shuffle_rate = 10
+fresh_value_weights = True
+shuffle_rate = 3
 
 num_selected_neurons=100
 select_func = None
 
-num_selected_neurons2=150
-select_func2 = sf.most_positive_select_func
+num_selected_neurons2=100
+select_func2 = None
 
 num_selected_neurons3=150
 select_func3 = None

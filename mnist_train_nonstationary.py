@@ -145,8 +145,13 @@ do_weight_restoration = p['do_weight_restoration']
 
 #save output layer weights for reinitializing
 if do_weight_restoration:
-    outweights1 = np.copy(net.layer[-1].weights)
     outweights2 = np.copy(net.layer[-1].weights)
+    #get other weights from a different network
+    if(p['fresh_value_weights']):
+        net2 = nnet.net(layers,learning_rate)
+        outweights1 = np.copy(net2.layer[-1].weights)
+    else:
+        outweights1 = np.copy(net.layer[-1].weights)
     
 for i in range(training_epochs):
     if(not (i%shuffle_rate)):
@@ -196,9 +201,15 @@ for i in range(training_epochs):
         net.update_weights()
     train_missed_percent = float(train_missed)/float(train_size)
 
+    #print('weights during test: ' + str(np.sum(net.layer[-1].weights**2.0)))
     if do_weight_restoration:
         tmpweights = np.copy(net.layer[-1].weights)
-        net.layer[-1].weights = np.copy(outweights1)
+        #if the network is training on P2 then use the saved P1 weights.
+        #otherwise it will use it's current P1 weights
+        if(train_set_to_use == 0):
+            net.layer[-1].weights = np.copy(outweights1)
+    net.train = False
+    #print('weights during test: ' + str(np.sum(net.layer[-1].weights**2.0)))
     
     #feed test set through to get test 1 rates
     net.input = np.transpose(test_data1)
@@ -218,8 +229,9 @@ for i in range(training_epochs):
     test_mse2 = np.sum(net.error**2)
     test_missed_percent2 = float(test_missed2)/float(test_size2)
     
+    net.train = True
     if do_weight_restoration:
-        net.layer[-1].weights = tmpweights
+        net.layer[-1].weights = np.copy(tmpweights)
     
     #log everything for saving
     train_mse_list.append(train_mse)
