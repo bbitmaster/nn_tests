@@ -12,22 +12,23 @@ data_dir = '../data/'
 incorrect_target = 0.0
 correct_target = 1.0
 
-num_hidden = 800
-num_hidden2 = 300;
+num_hidden = 500
+num_hidden2 = 500
+num_hidden3 = 500
 
-activation_function='sigmoid'
-activation_function2='tanh'
+activation_function='linear_rectifier'
+activation_function2='linear_rectifier'
+activation_function3='linear_rectifier'
 activation_function_final='softmax'
 
-sparse_penalty=0.01
-sparse_target=0.05
+sparse_penalty=None
+sparse_target=None
 
 sparse_penalty2=None
 sparse_target2=None
 
-
-#sparse_penalty=None
-#sparse_target=None
+sparse_penalty3=None
+sparse_target3=None
 
 minibatch_size=128
 
@@ -36,17 +37,19 @@ training_epochs = 3000
 
 forget_epoch = 1000
 
+
+
 num_selected_neurons=100
 select_func = None
 
 num_selected_neurons2=150
-select_func2 = sf.most_positive_select_func
+select_func2 = None
 
 num_selected_neurons3=150
 select_func3 = None
 
-dropout=0.5
-dropout2=0.5
+dropout=None
+dropout2=None
 dropout3=None
 
 initialization_scheme='glorot'
