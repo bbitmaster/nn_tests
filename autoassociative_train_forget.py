@@ -110,15 +110,15 @@ test_accuracy_old_list = []
 test_mse_new_list = []
 test_accuracy_new_list = []
 
-#comment/uncomment to make old data contain new
-if(p['nonstationary_training'] == False):
-    old_sample_data = np.append(new_sample_data,old_sample_data,axis=0)
-    old_sample_targets = np.append(new_sample_targets,old_sample_targets,axis=0)
-    num_old_samples = num_old_samples + num_new_samples;
-
 sample_data = old_sample_data;
 sample_targets = old_sample_targets
 num_samples = num_old_samples;
+
+#comment/uncomment to make old data contain new
+if(p['nonstationary_training'] == False):
+    sample_data = np.append(new_sample_data,old_sample_data,axis=0)
+    sample_targets = np.append(new_sample_targets,old_sample_targets,axis=0)
+    num__samples = num_old_samples + num_new_samples;
 
 for i in range(training_epochs):
     
