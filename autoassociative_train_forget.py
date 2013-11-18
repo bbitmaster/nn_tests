@@ -190,9 +190,9 @@ for i in range(training_epochs):
     test_mse_new_list.append(test_mse_new)
     test_accuracy_new_list.append(test_accuracy_new)
     
-    print('epoch ' + str(i) + ": " + " mse_old: " + str(test_mse_old) + " acc_old: " + str(test_accuracy_old)
-    + " mse_new: " + str(test_mse_new) + " acc_new: " + str(test_accuracy_new))
-
+     print('epoch ' + "{: 4d}".format(i) + ": " + " mse_old: " + "{:<8.4f}".format(test_mse_old) + " acc_old: " + "{:.4f}".format(test_accuracy_old)
+     + " mse_new: " + "{:8.4f}".format(test_mse_new) + " acc_new: " + "{:.4f}".format(test_accuracy_new))
+     
     if(time.time() - save_time > save_interval or i == training_epochs-1):
         print('saving results...')
         f_handle = h5py.File(p['results_dir'] + p['simname'] + p['version'] + '.h5py','w')
