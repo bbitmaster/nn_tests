@@ -12,6 +12,9 @@ data_dir = '../data/'
 #tells if the binary values are 0,1 (True) or -1,1 (False)
 zerosandones = False
 
+#tells if we are doing nonstationary training P1->P2 (True) or P1+P2->P1 (False)
+nonstationary_training=False
+
 num_hidden = 300
 num_hidden2 = 300
 num_hidden3 = 300
