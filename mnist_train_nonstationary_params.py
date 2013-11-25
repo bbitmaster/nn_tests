@@ -9,6 +9,8 @@ results_dir = '../results/'
 
 data_dir = '../data/'
 
+use_float32=True
+
 incorrect_target = 0.0
 correct_target = 1.0
 
@@ -21,6 +23,14 @@ activation_function2='linear_rectifier'
 activation_function3='linear_rectifier'
 activation_function_final='softmax'
 
+momentum=0.5
+momentum2=0.5
+momentum3=0.5
+
+maxnorm=None
+maxnorm2=None
+maxnorm3=None
+
 sparse_penalty=None
 sparse_target=None
 
@@ -32,12 +42,17 @@ sparse_target3=None
 
 minibatch_size=128
 
-learning_rate = .01
+#per layer learning rates
+learning_rate =       0.001
+learning_rate2 =      0.001
+learning_rate3 =      0.001
+learning_rate_final = 0.001
+
 training_epochs = 3000
 
-do_weight_restoration = True
+do_weight_restoration = False
 fresh_value_weights = True
-shuffle_rate = 3
+shuffle_rate = 10
 
 num_selected_neurons=100
 select_func = None

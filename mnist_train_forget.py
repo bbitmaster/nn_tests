@@ -60,6 +60,11 @@ def load_data(digits,dataset,p):
     class_data = np.ones((labels.shape[0],10))*p['incorrect_target']
     for i in range(labels.shape[0]):
         class_data[i,labels[i]] = p['correct_target'];
+
+    if(p['use_float32']):
+        sample_data = np.asarray(sample_data,np.float32)
+        class_data = np.asarray(class_data,np.float32)
+        
     return (sample_data,class_data)
 
 (sample_data,class_data) = load_data(range(10),"training",p)
@@ -85,7 +90,8 @@ layers.append(nnet.layer(p['num_hidden'],p['activation_function'],select_func=p[
                          initialization_scheme=p['initialization_scheme'],
                          initialization_constant=p['initialization_constant'],
                          dropout=p['dropout'],sparse_penalty=p['sparse_penalty'],
-                         sparse_target=p['sparse_target']))
+                         sparse_target=p['sparse_target'],use_float32=p['use_float32'],
+                         momentum=p['momentum'],maxnorm=p['maxnorm'],step_size=p['learning_rate']))
 
 #Add 2nd and 3rd hidden layers if there are parameters indicating that we should
 if(p.has_key('num_hidden2')):
@@ -94,7 +100,8 @@ if(p.has_key('num_hidden2')):
                              initialization_scheme=p['initialization_scheme2'],
                              initialization_constant=p['initialization_constant2'],
                              dropout=p['dropout2'],sparse_penalty=p['sparse_penalty2'],
-                             sparse_target=p['sparse_target2']))
+                             sparse_target=p['sparse_target2'],use_float32=p['use_float32'],
+                             momentum=p['momentum'],maxnorm=p['maxnorm'],step_size=p['learning_rate']))
 
 if(p.has_key('num_hidden3')):
     layers.append(nnet.layer(p['num_hidden3'],p['activation_function3'],select_func=p['select_func3'],
@@ -102,9 +109,11 @@ if(p.has_key('num_hidden3')):
                              initialization_scheme=p['initialization_scheme3'],
                              initialization_constant=p['initialization_constant3'],
                              dropout=p['dropout3'],sparse_penalty=p['sparse_penalty3'],
-                             sparse_target=p['sparse_target3']))
-                             
-layers.append(nnet.layer(10,p['activation_function_final']))
+                             sparse_target=p['sparse_target3'],use_float32=p['use_float32'],
+                             momentum=p['momentum'],maxnorm=p['maxnorm'],step_size=p['learning_rate']))
+
+layers.append(nnet.layer(10,p['activation_function_final'],use_float32=p['use_float32'],step_size=p['learning_rate_final']))
+
 
 learning_rate = p['learning_rate']
 
