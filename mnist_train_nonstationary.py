@@ -109,7 +109,8 @@ if(p.has_key('num_hidden3')):
                              sparse_target=p['sparse_target3'],use_float32=p['use_float32'],
                              momentum=p['momentum3'],maxnorm=p['maxnorm3'],step_size=p['learning_rate3']))
 
-layers.append(nnet.layer(5,p['activation_function_final'],use_float32=p['use_float32'],step_size=p['learning_rate_final']))
+layers.append(nnet.layer(5,p['activation_function_final'],use_float32=p['use_float32'],
+                             step_size=p['learning_rate_final'],momentum=p['momentum_final']))
 
 np.random.seed(p['random_seed']);
 
@@ -154,7 +155,7 @@ if do_weight_restoration:
     outweights2 = np.copy(net.layer[-1].weights)
     #get other weights from a different network
     if(p['fresh_value_weights']):
-        net2 = nnet.net(layers,learning_rate)
+        net2 = nnet.net(layers)
         outweights1 = np.copy(net2.layer[-1].weights)
     else:
         outweights1 = np.copy(net.layer[-1].weights)
