@@ -13,15 +13,15 @@ data_dir = '../data/'
 zerosandones = False
 
 #tells if we are doing nonstationary training P1->P2 (True) or P1+P2->P1 (False)
-nonstationary_training=False
+nonstationary_training=True
 
-num_hidden = 300
-num_hidden2 = 300
-num_hidden3 = 300
+num_hidden = 30
+#num_hidden2 = 300
+#num_hidden3 = 300
 
 activation_function='tanh'
 activation_function2='tanh'
-activation_function3='tanh'
+activation_function3='sigmoid'
 activation_function_final='tanh'
 
 sparse_penalty=None
@@ -33,15 +33,15 @@ sparse_target2=None
 sparse_penalty3=None
 sparse_target3=None
 
-sample_size = 100
-num_old_samples = 100
-num_new_samples = 100
-minibatch_size=10
+sample_size = 32
+num_old_samples = 20
+num_new_samples = 1
+minibatch_size=1
 
 learning_rate = .001
-training_epochs = 3000
+training_epochs = 100
 
-forget_epoch = 1000
+forget_epoch = 20
 
 num_selected_neurons=50
 select_func = None
