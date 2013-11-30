@@ -195,6 +195,12 @@ test_class2 = test_class2[5:10,:]
 
 do_weight_restoration = p['do_weight_restoration']
 
+#must be predefined to prevent crashes where they may be accessed later
+test_nll1=0.0
+test_nll2=0.0
+test_nll1_p2weights = 0.0
+test_nll2_p1weights = 0.0;
+
 #save output layer weights for reinitializing
 outweights2 = np.copy(net.layer[-1].weights)
 
@@ -265,7 +271,8 @@ for i in range(training_epochs):
         #print('isnan net.error: ' + str(np.max(np.isnan(net.error))))
         guess = np.argmax(net.output,0)
         c = np.argmax(classification,0)
-        train_nll = train_nll - np.sum(np.log(net.output)*classification)
+        if(p['activation_function_final'] == 'softmax'):
+            train_nll = train_nll - np.sum(np.log(net.output)*classification)
         train_mse = train_mse + np.sum(net.error**2)
         train_missed = train_missed + np.sum(c != guess)
 
@@ -288,7 +295,8 @@ for i in range(training_epochs):
     test_missed1 = np.sum(c != test_guess1)
     net.error = net.output - test_class1
     test_mse1 = np.sum(net.error**2)
-    test_nll1 = -np.sum(np.log(net.output)*test_class1)
+    if(p['activation_function_final'] == 'softmax'):
+        test_nll1 = -np.sum(np.log(net.output)*test_class1)
     test_nll1 = float(test_nll1)/float(test_size1)
     test_mse1 = float(test_mse1)/float(test_size1)
     test_missed_percent1 = float(test_missed1)/float(test_size1)
@@ -300,7 +308,8 @@ for i in range(training_epochs):
     test_missed2_p1weights = np.sum(c != test_guess2)
     net.error = net.output - test_class2
     test_mse2_p1weights = np.sum(net.error**2)
-    test_nll2_p1weights = -np.sum(np.log(net.output)*test_class2)
+    if(p['activation_function_final'] == 'softmax'):
+        test_nll2_p1weights = -np.sum(np.log(net.output)*test_class2)
     test_nll2_p1weights = float(test_nll2_p1weights)/float(test_size2)
     test_mse2_p1weights = float(test_mse2_p1weights)/float(test_size2)
     test_missed_percent2_p1weights = float(test_missed2_p1weights)/float(test_size2)
@@ -315,7 +324,8 @@ for i in range(training_epochs):
     test_missed2 = np.sum(c != test_guess2)
     net.error = net.output - test_class2
     test_mse2 = np.sum(net.error**2)
-    test_nll2 = -np.sum(np.log(net.output)*test_class2)
+    if(p['activation_function_final'] == 'softmax'):
+        test_nll2 = -np.sum(np.log(net.output)*test_class2)
     test_nll2 = float(test_nll2)/float(test_size2)
     test_mse2 = float(test_mse2)/float(test_size2)
     test_missed_percent2 = float(test_missed2)/float(test_size2)
@@ -327,7 +337,8 @@ for i in range(training_epochs):
     test_missed1_p2weights = np.sum(c != test_guess1)
     net.error = net.output - test_class1
     test_mse1_p2weights = np.sum(net.error**2)
-    test_nll1_p2weights = -np.sum(np.log(net.output)*test_class1)
+    if(p['activation_function_final'] == 'softmax'):
+        test_nll1_p2weights = -np.sum(np.log(net.output)*test_class1)
     test_nll1_p2weights = float(test_nll1_p2weights)/float(test_size1)
     test_mse1_p2weights = float(test_mse1_p2weights)/float(test_size1)
     test_missed_percent1_p2weights = float(test_missed1_p2weights)/float(test_size1)
@@ -365,13 +376,16 @@ for i in range(training_epochs):
 #    print('epoch ' + "{: 4d}".format(i) + ": " + " mse_old: " + "{:<8.4f}".format(test_mse_old) + " acc_old: " + "{:.4f}".format(test_accuracy_old)
 #    + " mse_new: " + "{:8.4f}".format(test_mse_new) + " acc_new: " + "{:.4f}".format(test_accuracy_new))
 
-    print('Train :               epoch ' + "{: 4d}".format(i) + ": NLL: " + "{:<8.4f}".format(train_nll) + " percent missed: " + "{:<8.4f}".format(train_missed_percent))
-    print('Test 1: (P1 Weights): epoch ' + "{: 4d}".format(i) + ": NLL: " + "{:<8.4f}".format(test_nll1) + " missed: " + "{: 5d}".format(test_missed1) + " percent missed: " + "{:<8.4f}".format(test_missed_percent1));
-    print('Test 2: (P2 weights): epoch ' + "{: 4d}".format(i) + ": NLL: " + "{:<8.4f}".format(test_nll2) + " missed: " + "{: 5d}".format(test_missed2) + " percent missed: " + "{:<8.4f}".format(test_missed_percent2));
+    print('Train :               epoch ' + "{: 4d}".format(i) + ": NLL: " + "{:<8.4f}".format(train_nll) +
+    "mse: " + "{:<8.4f}".format(train_mse) + " percent missed: " + "{:<8.4f}".format(train_missed_percent))
+    print('Test 1: (P1 Weights): epoch ' + "{: 4d}".format(i) + ": NLL: " + "{:<8.4f}".format(test_nll1) +
+    "mse: " + "{:<8.4f}".format(test_mse1) + " missed: " + "{: 5d}".format(test_missed1) + " percent missed: " + "{:<8.4f}".format(test_missed_percent1));
+    print('Test 2: (P2 weights): epoch ' + "{: 4d}".format(i) + ": NLL: " + "{:<8.4f}".format(test_nll2) +
+    "mse: " + "{:<8.4f}".format(test_mse2) + " missed: " + "{: 5d}".format(test_missed2) + " percent missed: " + "{:<8.4f}".format(test_missed_percent2));
     print('Test 1: (P2 Weights): epoch ' + "{: 4d}".format(i) + ": NLL: " + "{:<8.4f}".format(test_nll1_p2weights) +
-    " missed: " + "{: 5d}".format(test_missed1_p2weights) + " percent missed: " + "{:<8.4f}".format(test_missed_percent1_p2weights));
+    "mse: " + "{:<8.4f}".format(test_mse1_p2weights) + " missed: " + "{: 5d}".format(test_missed1_p2weights) + " percent missed: " + "{:<8.4f}".format(test_missed_percent1_p2weights));
     print('Test 2: (P1 Weights): epoch ' + "{: 4d}".format(i) + ": NLL: " + "{:<8.4f}".format(test_nll2_p1weights) +
-    " missed: " + "{: 5d}".format(test_missed2_p1weights) + " percent missed: " + "{:<8.4f}".format(test_missed_percent2_p1weights));
+    "mse: " + "{:<8.4f}".format(test_mse2_p1weights) + " missed: " + "{: 5d}".format(test_missed2_p1weights) + " percent missed: " + "{:<8.4f}".format(test_missed_percent2_p1weights));
 
     #f_out.write(str(train_mse) + "," + str(train_missed_percent) + "," + str(test_missed_percent) + "\n")
     if(time.time() - save_time > save_interval or i == training_epochs-1):
