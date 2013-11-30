@@ -235,7 +235,7 @@ for i in range(training_epochs):
             training_mode = MODE_P2
         print('shuffled to ' + str(training_mode));
     
-    
+    train_size = sample_data.shape[0]
     minibatch_count = int(train_size/minibatch_size)
     
     #shuffle data
@@ -262,6 +262,7 @@ for i in range(training_epochs):
             classification = classification[5:10,:]
         net.feed_forward()
         net.error = net.output - classification
+        #print('isnan net.error: ' + str(np.max(np.isnan(net.error))))
         guess = np.argmax(net.output,0)
         c = np.argmax(classification,0)
         train_nll = train_nll - np.sum(np.log(net.output)*classification)
