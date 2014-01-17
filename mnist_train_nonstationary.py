@@ -10,6 +10,10 @@ import time
 #h5py used for saving results to a file
 import h5py
 
+#constants
+MODE_P1 = 0
+MODE_P2 = 1
+
 #Get the parameters file from the command line
 #use mnist_train__forget_params.py by default (no argument given)
 if(len(sys.argv) > 1):
@@ -66,6 +70,31 @@ def load_data(digits,dataset,p):
         class_data = np.asarray(class_data,np.float32)
         
     return (sample_data,class_data)
+
+#This class simplifies swapping the output layer of the neural network
+class net_swapper(object):
+    def __init__(self,do_weight_restoration,outweights1,outweigts2):
+        self.outweights1 = outweights1
+        self.outweights2 = outweights2
+        self.mode = MODE_P1 #assume we are in mode P1 to start with
+        self.do_weight_restoration = do_weight_restoration
+    def swap_output_layer(self,net,mode):
+        #if weight restoration is turned off then do nothing
+        if(self.do_weight_restoration == False):
+            return
+        #if we are in mode P2 but P1 was requested, then swap weights to P1
+        if(mode == MODE_P1 and self.mode == MODE_P2):
+#            print('swapping to p1')
+            self.outweights2 = np.copy(net.layer[-1].weights)
+            net.layer[-1].weights = np.copy(self.outweights1)
+            self.mode = MODE_P1
+        # ... P1 but P2 was requested, then swap weights to P2
+        elif(mode == MODE_P2 and self.mode == MODE_P1):
+#            print('swapping to p2')
+            self.outweights1 = np.copy(net.layer[-1].weights)
+            net.layer[-1].weights = np.copy(self.outweights2)
+            self.mode = MODE_P2
+    
 
 (sample_data,class_data) = load_data(range(10),"training",p)
 train_size = sample_data.shape[0]
@@ -129,19 +158,30 @@ train_missed_list = [];
 train_missed_percent_list = [];
 train_nll_list = [];
 
-test_mse_list1 = [];
-test_missed_list1 = [];
-test_missed_percent_list1 = [];
-test_nll_list1 = [];
+test_mse1_list = [];
+test_missed1_list = [];
+test_missed_percent1_list = [];
+test_nll1_list = [];
 
-test_mse_list2 = [];
-test_missed_list2 = [];
-test_missed_percent_list2 = [];
-test_nll_list2 = [];
+test_mse2_list = [];
+test_missed2_list = [];
+test_missed_percent2_list = [];
+test_nll2_list = [];
+
+test_mse1_p2weights_list = [];
+test_missed1_p2weights_list = [];
+test_missed_percent1_p2weights_list = [];
+test_nll1_p2weights_list = [];
+
+test_mse2_p1weights_list = [];
+test_missed2_p1weights_list = [];
+test_missed_percent2_p1weights_list = [];
+test_nll2_p1weights_list = [];
+
+training_mode_list = [];
 
 shuffle_rate = p['shuffle_rate'];
 
-train_set_to_use_next = 0
 (sample_data1,class_data1) = load_data(range(5),"training",p);
 (sample_data2,class_data2) = load_data(range(5,10),"training",p);
 (test_data1,test_class1) = load_data(range(5),"testing",p);
@@ -155,19 +195,33 @@ test_class2 = test_class2[5:10,:]
 
 do_weight_restoration = p['do_weight_restoration']
 
+#must be predefined to prevent crashes where they may be accessed later
+test_nll1=0.0
+test_nll2=0.0
+test_nll1_p2weights = 0.0
+test_nll2_p1weights = 0.0;
+
 #save output layer weights for reinitializing
-if do_weight_restoration:
-    outweights2 = np.copy(net.layer[-1].weights)
-    #get other weights from a different network
-    if(p['fresh_value_weights']):
-        net2 = nnet.net(layers)
-        outweights1 = np.copy(net2.layer[-1].weights)
-    else:
-        outweights1 = np.copy(net.layer[-1].weights)
-    
+outweights2 = np.copy(net.layer[-1].weights)
+
+#get other weights from a different network
+net2 = nnet.net(layers)
+outweights1 = np.copy(net2.layer[-1].weights)
+del net2
+
 nll_shuffle = p['nll_shuffle']
 train_nll = 1e99
 
+nswp = net_swapper(do_weight_restoration,outweights1,outweights2)
+nswp.swap_output_layer(net,MODE_P2);
+nswp.swap_output_layer(net,MODE_P1);
+nswp.swap_output_layer(net,MODE_P1);
+
+training_mode = MODE_P2
+
+write_flag=5
+save_and_exit=False
+t = time.time()
 for i in range(training_epochs):
 
     #if nll_shuffle is none then shuffle every n epochs
@@ -179,24 +233,30 @@ for i in range(training_epochs):
         if(train_nll < nll_shuffle):
             do_shuffle = True
             
-    if(do_shuffle or i == 0):
-        print('shuffling to ' + str(train_set_to_use_next));
-        if(train_set_to_use_next == 0):
-            (sample_data,class_data) = (sample_data1,class_data1)
-            if do_weight_restoration:
-                print("restoring output weights to P1")
-                outweights2 = np.copy(net.layer[-1].weights)
-                net.layer[-1].weights = np.copy(outweights1)
-            train_set_to_use_next = 1
-        elif(train_set_to_use_next == 1):
-            (sample_data,class_data) = (sample_data2,class_data2)
-            if do_weight_restoration:
-                print("restoring output weights to P2")
-                outweights1 = np.copy(net.layer[-1].weights)
-                net.layer[-1].weights = np.copy(outweights2)
-            train_set_to_use_next = 0
-        train_size = sample_data.shape[0]
 
+    if(do_shuffle or i == 0):
+        #if we're in mode P2, then we need to switch to mode P1
+        if(training_mode == MODE_P2):
+            if(nll_shuffle is not None and write_flag==4):
+                print("writing results for C2C")
+                f = open(p['results_dir'] + p['simname'] + p['version'] + '.txt','w')
+                f.write(str(test_missed_percent1) + '\n')
+                f.write(str(test_nll1) + '\n')
+                f.write(str(test_missed1) + '\n')
+                f.close()
+            #kill after 10 shuffles
+            if(write_flag == 0):
+                save_and_exit=True
+            write_flag = write_flag-1
+            (sample_data,class_data) = (sample_data1,class_data1)
+            training_mode = MODE_P1
+        #if we're in mode P1, then swap to P2
+        elif(training_mode == MODE_P1):
+            (sample_data,class_data) = (sample_data2,class_data2)
+            training_mode = MODE_P2
+        print('shuffled to ' + str(training_mode));
+    
+    train_size = sample_data.shape[0]
     minibatch_count = int(train_size/minibatch_size)
     
     #shuffle data
@@ -204,6 +264,9 @@ for i in range(training_epochs):
     np.random.shuffle(sample_data)
     np.random.set_state(rng_state)
     np.random.shuffle(class_data)
+
+    #swap the network output layer to the correct one for training mode    
+    nswp.swap_output_layer(net,training_mode)
     
     #count number of correct
     train_missed = 0.0;
@@ -214,15 +277,17 @@ for i in range(training_epochs):
         net.input = np.transpose(sample_data[j*minibatch_size:(j+1)*minibatch_size])
         tmp = np.transpose(sample_data[j*minibatch_size:(j+1)*minibatch_size])
         classification = np.transpose(class_data[j*minibatch_size:(j+1)*minibatch_size]) 
-        if(train_set_to_use_next == 1):
+        if(training_mode == MODE_P1):
             classification = classification[0:5,:]
-        if(train_set_to_use_next == 0):
+        elif(training_mode == MODE_P2):
             classification = classification[5:10,:]
         net.feed_forward()
         net.error = net.output - classification
+        #print('isnan net.error: ' + str(np.max(np.isnan(net.error))))
         guess = np.argmax(net.output,0)
         c = np.argmax(classification,0)
-        train_nll = train_nll - np.sum(np.log(net.output)*classification)
+        if(p['activation_function_final'] == 'softmax'):
+            train_nll = train_nll - np.sum(np.log(net.output)*classification)
         train_mse = train_mse + np.sum(net.error**2)
         train_missed = train_missed + np.sum(c != guess)
 
@@ -232,13 +297,8 @@ for i in range(training_epochs):
     train_mse = float(train_mse)/float(train_size)
     train_missed_percent = float(train_missed)/float(train_size)
     
-    #print('weights during test: ' + str(np.sum(net.layer[-1].weights**2.0)))
-    if do_weight_restoration:
-        tmpweights = np.copy(net.layer[-1].weights)
-        #if the network is training on P2 then use the saved P1 weights.
-        #otherwise it will use it's current P1 weights
-        if(train_set_to_use_next == 0):
-            net.layer[-1].weights = np.copy(outweights1)
+
+    nswp.swap_output_layer(net,MODE_P1)    
     net.train = False
     #print('weights during test: ' + str(np.sum(net.layer[-1].weights**2.0)))
     
@@ -248,72 +308,131 @@ for i in range(training_epochs):
     test_guess1 = np.argmax(net.output,0)
     c = np.argmax(test_class1,0)
     test_missed1 = np.sum(c != test_guess1)
+    net.error = net.output - test_class1
     test_mse1 = np.sum(net.error**2)
-    test_nll1 = -np.sum(np.log(net.output)*test_class1)
+    if(p['activation_function_final'] == 'softmax'):
+        test_nll1 = -np.sum(np.log(net.output)*test_class1)
+    test_nll1 = float(test_nll1)/float(test_size1)
     test_mse1 = float(test_mse1)/float(test_size1)
     test_missed_percent1 = float(test_missed1)/float(test_size1)
-    if do_weight_restoration:
-        net.layer[-1].weights = np.copy(tmpweights)
-        
-    if do_weight_restoration:
-        tmpweights = np.copy(net.layer[-1].weights)
-        #if the network is training on P1 then use the saved P2 weights.
-        #otherwise it will use it's current P2 weights
-        if(train_set_to_use_next == 1):
-            net.layer[-1].weights = np.copy(outweights2)
-            
-    #feed test set through to get test 2 rates
+
+    net.input = np.transpose(test_data2)
+    net.feed_forward()
+    test_guess2 = np.argmax(net.output,0)
+    c = np.argmax(test_class2,0)
+    test_missed2_p1weights = np.sum(c != test_guess2)
+    net.error = net.output - test_class2
+    test_mse2_p1weights = np.sum(net.error**2)
+    if(p['activation_function_final'] == 'softmax'):
+        test_nll2_p1weights = -np.sum(np.log(net.output)*test_class2)
+    test_nll2_p1weights = float(test_nll2_p1weights)/float(test_size2)
+    test_mse2_p1weights = float(test_mse2_p1weights)/float(test_size2)
+    test_missed_percent2_p1weights = float(test_missed2_p1weights)/float(test_size2)
+
+
+    nswp.swap_output_layer(net,MODE_P2)
+                #feed test set through to get test 2 rates
     net.input = np.transpose(test_data2)
     net.feed_forward()
     test_guess2 = np.argmax(net.output,0)
     c = np.argmax(test_class2,0)
     test_missed2 = np.sum(c != test_guess2)
+    net.error = net.output - test_class2
     test_mse2 = np.sum(net.error**2)
-    test_nll2 = -np.sum(np.log(net.output)*test_class2)
+    if(p['activation_function_final'] == 'softmax'):
+        test_nll2 = -np.sum(np.log(net.output)*test_class2)
+    test_nll2 = float(test_nll2)/float(test_size2)
     test_mse2 = float(test_mse2)/float(test_size2)
     test_missed_percent2 = float(test_missed2)/float(test_size2)
 
+    net.input = np.transpose(test_data1)
+    net.feed_forward()
+    test_guess1 = np.argmax(net.output,0)
+    c = np.argmax(test_class1,0)
+    test_missed1_p2weights = np.sum(c != test_guess1)
+    net.error = net.output - test_class1
+    test_mse1_p2weights = np.sum(net.error**2)
+    if(p['activation_function_final'] == 'softmax'):
+        test_nll1_p2weights = -np.sum(np.log(net.output)*test_class1)
+    test_nll1_p2weights = float(test_nll1_p2weights)/float(test_size1)
+    test_mse1_p2weights = float(test_mse1_p2weights)/float(test_size1)
+    test_missed_percent1_p2weights = float(test_missed1_p2weights)/float(test_size1)
+
     net.train = True
-    if do_weight_restoration:
-        net.layer[-1].weights = np.copy(tmpweights)
-    
+
     #log everything for saving
     train_nll_list.append(train_nll)
     train_mse_list.append(train_mse)
     train_missed_list.append(train_missed)
     train_missed_percent_list.append(train_missed_percent)
     
-	#test rate 1 and 2
-    test_mse_list1.append(test_mse1)
-    test_missed_list1.append(test_missed1)
-    test_missed_percent_list1.append(test_missed_percent1)
-    test_nll_list1.append(test_nll1)
-    test_mse_list2.append(test_mse2)
-    test_missed_list2.append(test_missed2)
-    test_missed_percent_list2.append(test_missed_percent2)
-    test_nll_list2.append(test_nll2)
+    #test rate 1 and 2
+    test_mse1_list.append(test_mse1)
+    test_missed1_list.append(test_missed1)
+    test_missed_percent1_list.append(test_missed_percent1)
+    test_nll1_list.append(test_nll1)
     
-    print('epoch ' + str(i) + ": train NLL: " + str(train_nll) + " train percent missed: " + str(train_missed_percent))
-    print('epoch ' + str(i) + ": test-missed1: " + str(test_missed1) + " MSE1: " + str(test_mse1) + " percent missed1: " + str(test_missed_percent1));
-    print('epoch ' + str(i) + ": test-missed2: " + str(test_missed2) + " MSE2: " + str(test_mse2) + " percent missed2: " + str(test_missed_percent2));
+    test_mse2_list.append(test_mse2)
+    test_missed2_list.append(test_missed2)
+    test_missed_percent2_list.append(test_missed_percent2)
+    test_nll2_list.append(test_nll2)
+
+    test_mse1_p2weights_list.append(test_mse1)
+    test_missed1_p2weights_list.append(test_missed1)
+    test_missed_percent1_p2weights_list.append(test_missed_percent1)
+    test_nll1_p2weights_list.append(test_nll1)
+    
+    test_mse2_p1weights_list.append(test_mse2)
+    test_missed2_p1weights_list.append(test_missed2)
+    test_missed_percent2_p1weights_list.append(test_missed_percent2)
+    test_nll2_p1weights_list.append(test_nll2)
+
+    training_mode_list.append(training_mode)
+#    print('epoch ' + "{: 4d}".format(i) + ": " + " mse_old: " + "{:<8.4f}".format(test_mse_old) + " acc_old: " + "{:.4f}".format(test_accuracy_old)
+#    + " mse_new: " + "{:8.4f}".format(test_mse_new) + " acc_new: " + "{:.4f}".format(test_accuracy_new))
+    time_elapsed = time.time() - t
+    t = time.time()
+    print('Train :               epoch ' + "{0: 4d}".format(i) + ": NLL: " + "{0:<8.4f}".format(train_nll) +
+    "mse: " + "{0:<8.4f}".format(train_mse) + " percent missed: " + "{0:<8.4f}".format(train_missed_percent) + str(time_elapsed))
+    print('Test 1: (P1 Weights): epoch ' + "{0: 4d}".format(i) + ": NLL: " + "{0:<8.4f}".format(test_nll1) +
+    "mse: " + "{0:<8.4f}".format(test_mse1) + " missed: " + "{0: 5d}".format(test_missed1) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent1));
+    print('Test 2: (P2 weights): epoch ' + "{0: 4d}".format(i) + ": NLL: " + "{0:<8.4f}".format(test_nll2) +
+    "mse: " + "{0:<8.4f}".format(test_mse2) + " missed: " + "{0: 5d}".format(test_missed2) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent2));
+    print('Test 1: (P2 Weights): epoch ' + "{0: 4d}".format(i) + ": NLL: " + "{0:<8.4f}".format(test_nll1_p2weights) +
+    "mse: " + "{0:<8.4f}".format(test_mse1_p2weights) + " missed: " + "{0: 5d}".format(test_missed1_p2weights) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent1_p2weights));
+    print('Test 2: (P1 Weights): epoch ' + "{0: 4d}".format(i) + ": NLL: " + "{0:<8.4f}".format(test_nll2_p1weights) +
+    "mse: " + "{0:<8.4f}".format(test_mse2_p1weights) + " missed: " + "{0: 5d}".format(test_missed2_p1weights) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent2_p1weights));
 
     #f_out.write(str(train_mse) + "," + str(train_missed_percent) + "," + str(test_missed_percent) + "\n")
-    if(time.time() - save_time > save_interval or i == training_epochs-1):
+    if(time.time() - save_time > save_interval or i == training_epochs-1 or save_and_exit==True):
         print('saving results...')
         f_handle = h5py.File(p['results_dir'] + p['simname'] + p['version'] + '.h5py','w')
         f_handle['train_mse_list'] = np.array(train_mse_list);
         f_handle['train_missed_list'] = np.array(train_missed_list);
         f_handle['train_missed_percent_list'] = np.array(train_missed_percent_list);
         
-        f_handle['test_mse_list1'] = np.array(test_mse_list1);
-        f_handle['test_missed_list1'] = np.array(test_missed_list1);
-        f_handle['test_missed_percent_list1'] = np.array(test_missed_percent_list1);
-        f_handle['test_nll_list1'] = np.array(test_nll_list1)
+        f_handle['test_mse1_list'] = np.array(test_mse1_list);
+        f_handle['test_missed1_list'] = np.array(test_missed1_list);
+        f_handle['test_missed_percent1_list'] = np.array(test_missed_percent1_list);
+        f_handle['test_nll1_list'] = np.array(test_nll1_list)
         
-        f_handle['test_mse_list2'] = np.array(test_mse_list2);
-        f_handle['test_missed_list2'] = np.array(test_missed_list2);
-        f_handle['test_missed_percent_list2'] = np.array(test_missed_percent_list2);
-        f_handle['test_nll_list2'] = np.array(test_nll_list2)
+        f_handle['test_mse2_list'] = np.array(test_mse2_list);
+        f_handle['test_missed2_list'] = np.array(test_missed2_list);
+        f_handle['test_missed_percent2_list'] = np.array(test_missed_percent2_list);
+        f_handle['test_nll2_list'] = np.array(test_nll2_list)
+
+        f_handle['test_mse1_p2weights_list'] = np.array(test_mse1_p2weights_list);
+        f_handle['test_missed1_p2weights_list'] = np.array(test_missed1_p2weights_list);
+        f_handle['test_missed_percent1_p2weights_list'] = np.array(test_missed_percent1_p2weights_list);
+        f_handle['test_nll1_p2weights_list'] = np.array(test_nll1_p2weights_list)
+        
+        f_handle['test_mse2_p1weights_list'] = np.array(test_mse2_p1weights_list);
+        f_handle['test_missed2_p1weights_list'] = np.array(test_missed2_p1weights_list);
+        f_handle['test_missed_percent2_p1weights_list'] = np.array(test_missed_percent2_p1weights_list);
+        f_handle['test_nll2_p1weights_list'] = np.array(test_nll2_p1weights_list)
+
+        f_handle['training_mode_list'] = np.array(training_mode_list)
+   
         #iterate through all parameters and save them in the parameters group
         p_group = f_handle.create_group('parameters');
         for param in p.iteritems():
@@ -322,6 +441,5 @@ for i in range(training_epochs):
                 p_group[param[0]] = param[1];
         f_handle.close();
         save_time = time.time();
-         
-         
-#f_out.close();
+        if(save_and_exit):
+            break
