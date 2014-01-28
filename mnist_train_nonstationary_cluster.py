@@ -127,21 +127,21 @@ np.random.seed(p['random_seed']);
 #init net
 net = nnet.net(layers)
 
-if(p.has_key('cluster_selection_type')):
+if(p.has_key('cluster_func') and p['cluster_func'] is not None):
     net.layer[0].centroids = np.asarray((((np.random.random((net.layer[0].weights.shape)) - 0.5)*2.0)),np.float32)
-    net.layer[0].select_func = csf.cluster_select_func
+    net.layer[0].select_func = csf.select_names[p['cluster_func']]
     net.layer[0].centroid_speed = p['cluster_speed']
     net.layer[0].num_selected = p['clusters_selected']
 
-if(p.has_key('cluster_selection_type2')):
+if(p.has_key('cluster_func2') and p['cluster_func2'] is not None):
     net.layer[1].centroids = np.asarray((((np.random.random((net.layer[1].weights.shape)) - 0.5)*2.0)),np.float32)
-    net.layer[1].select_func = csf.cluster_select_func
+    net.layer[1].select_func = csf.select_names[p['cluster_func2']]
     net.layer[1].centroid_speed = p['cluster_speed2']
     net.layer[1].num_selected = p['clusters_selected2']
 
-if(p.has_key('cluster_selection_type3')):
+if(p.has_key('cluster_func3') and p['cluster_func3'] is not None):
     net.layer[2].centroids = np.asarray((((np.random.random((net.layer[2].weights.shape)) - 0.5)*2.0)),np.float32)
-    net.layer[2].select_func = csf.cluster_select_func
+    net.layer[2].select_func = csf.select_names[p['cluster_func3']]
     net.layer[2].centroid_speed = p['cluster_speed3']
     net.layer[2].num_selected = p['clusters_selected3']
 
@@ -296,8 +296,8 @@ for i in range(training_epochs):
         for k in range(len(net.layer)):
             str_list = ("","2","3")
             str_to_append = str_list[k]
-            if(p.has_key('cluster_selection_type' + str_to_append)):
-                csf.cluster_update_func(net.layer[k])
+            if(p.has_key('cluster_func' + str_to_append) and p['cluster_func' + str_to_append] is not None):
+                csf.update_names[p['cluster_func' + str_to_append]](net.layer[k])
 
     train_nll = float(train_nll)/float(train_size)
     train_mse = float(train_mse)/float(train_size)

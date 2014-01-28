@@ -11,17 +11,17 @@ data_dir = '../data/'
 
 use_float32=True
 
-incorrect_target = -1.0
+incorrect_target = 0.0
 correct_target = 1.0
 
-num_hidden = 3000
+num_hidden = 1000
 #num_hidden2 = 500
 #num_hidden3 = 500
 
 activation_function='tanh'
 activation_function2='linear_rectifier'
 activation_function3='linear_rectifier'
-activation_function_final='tanh'
+activation_function_final='softmax'
 
 momentum=0.0
 momentum2=0.0
@@ -57,7 +57,10 @@ shuffle_rate = 10
 nll_shuffle = None
 
 #can be normal or weighted
-cluster_selection_type="normal"
+cluster_func = 'cluster_func_starvation1'
+cluster_func2 = None
+cluster_func3 = None
+
 cluster_speed = 0.001
 clusters_selected = 100
 
