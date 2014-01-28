@@ -21,7 +21,7 @@ num_hidden = 1000
 activation_function='tanh'
 activation_function2='linear_rectifier'
 activation_function3='linear_rectifier'
-activation_function_final='softmax'
+activation_function_final='tanh'
 
 momentum=0.0
 momentum2=0.0
@@ -57,7 +57,7 @@ shuffle_rate = 10
 nll_shuffle = None
 
 #can be normal or weighted
-cluster_func = 'cluster_func_starvation1'
+cluster_func = 'cluster_func'
 cluster_func2 = None
 cluster_func3 = None
 

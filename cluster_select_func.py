@@ -16,7 +16,6 @@ def cluster_select_func(self,params):
 
 def cluster_update_func(self):
     alpha = self.centroid_speed    
-    print("def cluster_update_func(self):");
     self.centroids = self.centroids + alpha*(self.centroids_prime - self.centroids)
 
 def cluster_select_func_starvation1(self,params):
