@@ -16,7 +16,6 @@ def cluster_select_func(self,params):
 
 def cluster_update_func(self):
     alpha = self.centroid_speed    
-    print("def cluster_update_func(self):");
     self.centroids = self.centroids + alpha*(self.centroids_prime - self.centroids)
 
 def cluster_select_func_starvation1(self,params):
@@ -30,7 +29,6 @@ def cluster_select_func_starvation1(self,params):
                   np.sum(self.input**2,0)[np.newaxis,:]
     #scale by starvation trace
     self.distances = self.distances*self.starvation
-
     distances_sorted = np.sort(self.distances,axis=0)
     self.selected_neurons = self.distances > distances_sorted[num_selected,:]
     self.saved_selected_neurons = np.copy(self.selected_neurons)
@@ -45,8 +43,9 @@ def cluster_update_func_starvation1(self):
     alpha = self.centroid_speed    
     self.centroids = self.centroids + alpha*(self.centroids_prime - self.centroids)
     #update starvation count
-    selected_count = np.sum(self.saved_selected_neurons,1)
+    selected_count = np.sum(~self.saved_selected_neurons,1)
     self.starvation = self.starvation + selected_count[:,np.newaxis]
+    #print(str(self.starvation))
 
 select_names = {}
 select_names['cluster_func'] = cluster_select_func
