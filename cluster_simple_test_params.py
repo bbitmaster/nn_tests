@@ -16,7 +16,8 @@ correct_target = 1.0
 
 examples_per_class = 30
 spread = 0.2
-dump_to_file = False
+dump_to_file = True
+dump_path = "/local_scratch/clustersimpletest1/"
 frameskip = 25;
 
 img_width = 720

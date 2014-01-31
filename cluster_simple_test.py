@@ -31,6 +31,7 @@ np.random.seed(p['random_seed'])
 examples_per_class = p['examples_per_class'];
 spread = p['spread']
 
+dump_path = p['dump_path']
 dump_to_file = p['dump_to_file']
 frameskip = p['frameskip']
 img_width = p['img_width'];
@@ -219,8 +220,11 @@ while(epoch < p['total_epochs']):
         
         plt.drawRect(450,540,340,360,color=(1,1,1),use_image_coords=True)
         plt.drawText(450,341,"P1 Data",color=(0.0,0.0,0.0),use_image_coords=True)
-    print("epoch: " + str(epoch) + "percent: " + str(percent_miss1))
+    print("epoch: " + str(epoch) + 
+		  " P1 percent: " + str(percent_miss1) + " P1 MSE: " + str(np.sum(neterror1**2)) +
+		  " P2 percent: " + str(percent_miss2) + " P2 MSE: " + str(np.sum(neterror2**2)))
     if(dump_to_file):
+        print("saving: " + dump_path + "nn_dump" + str(epoch))
         plt.save_plot(dump_path + "nn_dump" + str(epoch) + ".png")
     else:
         if(epoch%frameskip == 0):
