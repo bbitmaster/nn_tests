@@ -54,7 +54,7 @@ total_epochs = 3000
 #cluster_func = 'cluster_func'
 cluster_func = None
 cluster_speed = 0.05
-clusters_selected = 4
+clusters_selected = 8
 
 dropout=None
 
