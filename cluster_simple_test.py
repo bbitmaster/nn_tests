@@ -5,6 +5,7 @@ import sys
 from nnet_toolkit import nnet
 
 import numpy as np
+import scipy.stats
 import matplotlib.cm as cm
 import image_plotter
 import cluster_select_func as csf
@@ -63,7 +64,11 @@ layers.append(nnet.layer(num_classes,p['activation_function_final'],use_float32=
 net = nnet.net(layers)
 
 if(p.has_key('cluster_func') and p['cluster_func'] is not None):
-    net.layer[0].centroids = np.asarray((((np.random.random((net.layer[0].weights.shape)) - 0.5)*2.0)),np.float32)
+    #net.layer[0].centroids = np.asarray((((np.random.random((net.layer[0].weights.shape)) - 0.5)*2.0)),np.float32)
+    net.layer[0].centroids = np.asarray(np.zeros(net.layer[0].weights.shape),np.float32)
+#set bias to 1
+    net.layer[0].centroids[:,-1] = 1.0
+    net.layer[0].centroids[:,-1] = -10000.0
     net.layer[0].select_func = csf.select_names[p['cluster_func']]
     net.layer[0].centroid_speed = p['cluster_speed']
     net.layer[0].num_selected = p['clusters_selected']
@@ -113,6 +118,17 @@ if(not dump_to_file):
 
 epoch = 1;
 
+#init variables for estimating label mean and standard deviation
+mean_alpha = 0.9
+var_alpha = 0.9
+
+sample_data_tmp = np.zeros((2,2,30),dtype=np.float32)
+sample_data_mean_tmp = np.zeros((2,2),dtype=np.float32)
+sample_data_var_tmp = np.zeros((2,2),dtype=np.float32)
+label_mean = np.zeros((2,2),dtype=np.float32)
+label_var = np.ones((2,2),dtype=np.float32)
+membership = np.ones(2,dtype=np.float32)
+
 while(epoch < p['total_epochs']):
 
     if(epoch < p['forget_epochs']):
@@ -123,9 +139,53 @@ while(epoch < p['total_epochs']):
         train_sample_data = sample_data2
         train_class_data = class_data2
         train_mode = 1
-
+ 
     net.input = train_sample_data;
     net.feed_forward()
+    
+#    np.savetxt("dmp/distances_epoch" + str(epoch) + ".csv",net.layer[0].distances,delimiter=",");
+#    asdf
+#    print("Neuron 1 Centroid 11")
+#    print(str(self.layer[0].input[:,1]);
+#    print(str(self.layer[0].input[:,1]);
+    for l in range(2):
+        mask = np.equal(l,np.argmax(train_class_data,0))
+        sample_data_tmp[l] = train_sample_data[:,mask]
+        sample_data_mean_tmp[l] = np.mean(sample_data_tmp[l],1)
+        sample_data_var_tmp[l] = np.var(sample_data_tmp[l],1)
+#compute membership
+#note: this assumes imput dimension of 2-- need to change for larger inputs
+        membership[l] = scipy.stats.norm.pdf(sample_data_mean_tmp[l,0],label_mean[0,l],np.sqrt(label_var[0,l]))
+        membership[l] *= scipy.stats.norm.pdf(sample_data_mean_tmp[l,1],label_mean[1,l],np.sqrt(label_var[1,l]))
+        label_mean[:,l] = mean_alpha*label_mean[:,l] + (1.0 - mean_alpha)*sample_data_mean_tmp[l]
+        label_var[:,l] = var_alpha*label_var[:,l] + (1.0 - var_alpha)*sample_data_var_tmp[l]
+        print("label: " + str(l) + " mean: " + str(label_mean[:,l]) + " var: " + str(label_var[:,l]) + " membership: " + str(membership[l]))
+
+
+    number_to_replace = 16
+    neuron_used_indices = net.layer[0].selected_count.argsort()
+    for l in range(2):
+        if(membership[l] < .2):
+            print("MEMBERSHIP EXCEEDED THRESHOLD FOR LABEL " + str(l))
+            #get the 8 least selected neurons
+            replace_indices = neuron_used_indices[0:number_to_replace]
+            neuron_used_indices = neuron_used_indices[number_to_replace:]
+            #need 8 sample data points -- could use k-means -- for now sample randomly
+            #samples is S x N where S is number os samples, and N is input size
+            samples = sample_data_tmp[l][:,0:number_to_replace]
+
+            #need to tack on the bias
+            samples = np.append(samples,np.ones((1,samples.shape[1]),dtype=samples.dtype),axis=0)
+            
+            #replace centroids with new ones drawn from samples
+            net.layer[0].centroids[replace_indices,:] = samples.transpose()
+            #reset centroid mean
+            label_mean[:,l] = sample_data_mean_tmp[l]
+            label_var[:,l] = sample_data_var_tmp[l]
+
+
+
+
     net.error = net.output - train_class_data
     neterror = net.error
     net_classes = net.output
@@ -134,7 +194,6 @@ while(epoch < p['total_epochs']):
     net.update_weights()
     if(p['cluster_func'] is not None):
         csf.update_names[p['cluster_func']](net.layer[0])
-    
     #get class 1 error rate
     net.input = sample_data1;
     net.feed_forward()
@@ -155,7 +214,7 @@ while(epoch < p['total_epochs']):
     percent_correct2 = num_correct2/float(2*examples_per_class)
     percent_miss2 = 1.0 - percent_correct2;
 
-    if(dump_to_file or epoch%frameskip == 0):
+    if((dump_to_file or epoch%frameskip == 0) and epoch > 47):
         xv, yv = np.meshgrid(np.linspace(vx_axis[0],vx_axis[1],img_width),np.linspace(vy_axis[0],vy_axis[1],img_height))
         xv = np.reshape((xv),(img_height*img_width))
         yv = np.reshape((yv),(img_height*img_width))
@@ -181,7 +240,7 @@ while(epoch < p['total_epochs']):
         #draw centroids
         if(p['cluster_func'] is not None):
             plt.drawPoint(net.layer[0].centroids[:,0],net.layer[0].centroids[:,1],size=2,color=(1.0,1.0,0.8))
-
+        
         #draw dot-product = 0 lines
         x1 = np.zeros(num_hidden);
         y1 = np.zeros(num_hidden);
