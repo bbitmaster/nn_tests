@@ -42,7 +42,7 @@ img_height = p['img_height'];
 vx_axis = [p['axis_x_min'],p['axis_x_max']];
 vy_axis = [p['axis_y_min'],p['axis_y_max']];
 
-num_classes = 2
+num_classes = p['num_classes']
 num_hidden = p['num_hidden']
 
 training_epochs = p['training_epochs']
@@ -74,11 +74,15 @@ if(p.has_key('cluster_func') and p['cluster_func'] is not None):
     net.layer[0].num_selected = p['clusters_selected']
 
 #Generate Random Classes
-sample_data1 = np.zeros([num_classes,num_classes*examples_per_class])
+sample_data1 = np.zeros([2,num_classes*examples_per_class])
 class_data1 = np.ones([num_classes,num_classes*examples_per_class])*p['incorrect_target']
 
-center_x_list1 = [0.7,0.7];
-center_y_list1 = [0.7,-0.7]
+#center_x_list1 = [0.7,0.7]
+#center_y_list1 = [0.7,-0.7]
+
+center_x_list1 = p['center_x_list1']
+center_y_list1 = p['center_y_list1']
+
 for i in range(num_classes):
     center_x = center_x_list1[i];
     center_y = center_y_list1[i];
@@ -88,11 +92,15 @@ for i in range(num_classes):
     sample_data1[0:2,i*examples_per_class:(i+1)*examples_per_class] = c 
     class_data1[i,i*examples_per_class:(i+1)*examples_per_class] = 1.0
 
-sample_data2 = np.zeros([num_classes,num_classes*examples_per_class])
+sample_data2 = np.zeros([2,num_classes*examples_per_class])
 class_data2 = np.ones([num_classes,num_classes*examples_per_class])*p['incorrect_target']
 
-center_x_list2 = [-0.7,-0.7];
-center_y_list2 = [-0.7,0.7]
+#center_x_list2 = [-0.7,-0.7]
+#center_y_list2 = [-0.7,0.7]
+
+center_x_list2 = p['center_x_list2']
+center_y_list2 = p['center_y_list2']
+
 for i in range(num_classes):
     center_x = center_x_list2[i];
     center_y = center_y_list2[i];
@@ -122,12 +130,12 @@ epoch = 1;
 mean_alpha = 0.9
 var_alpha = 0.9
 
-sample_data_tmp = np.zeros((2,2,30),dtype=np.float32)
-sample_data_mean_tmp = np.zeros((2,2),dtype=np.float32)
-sample_data_var_tmp = np.zeros((2,2),dtype=np.float32)
-label_mean = np.zeros((2,2),dtype=np.float32)
-label_var = np.ones((2,2),dtype=np.float32)
-membership = np.ones(2,dtype=np.float32)
+sample_data_tmp = np.zeros((num_classes,2,30),dtype=np.float32)
+sample_data_mean_tmp = np.zeros((num_classes,2),dtype=np.float32)
+sample_data_var_tmp = np.zeros((num_classes,2),dtype=np.float32)
+label_mean = np.zeros((2,num_classes),dtype=np.float32)
+label_var = np.ones((2,num_classes),dtype=np.float32)
+membership = np.ones(num_classes,dtype=np.float32)
 
 while(epoch < p['total_epochs']):
 
@@ -148,7 +156,7 @@ while(epoch < p['total_epochs']):
 #    print("Neuron 1 Centroid 11")
 #    print(str(self.layer[0].input[:,1]);
 #    print(str(self.layer[0].input[:,1]);
-    for l in range(2):
+    for l in range(num_classes):
         mask = np.equal(l,np.argmax(train_class_data,0))
         sample_data_tmp[l] = train_sample_data[:,mask]
         sample_data_mean_tmp[l] = np.mean(sample_data_tmp[l],1)
@@ -164,7 +172,7 @@ while(epoch < p['total_epochs']):
 
     number_to_replace = 16
     neuron_used_indices = net.layer[0].selected_count.argsort()
-    for l in range(2):
+    for l in range(6):
         if(membership[l] < .2):
             print("MEMBERSHIP EXCEEDED THRESHOLD FOR LABEL " + str(l))
             #get the 8 least selected neurons
@@ -201,7 +209,7 @@ while(epoch < p['total_epochs']):
     neterror1 = net.error
     net_classes1 = net.output
     num_correct1 = sum(np.equal(np.argmax(net_classes1,0),np.argmax(class_data1,0)))
-    percent_correct1 = num_correct1/float(2*examples_per_class)
+    percent_correct1 = num_correct1/float(num_classes*examples_per_class)
     percent_miss1 = 1.0 - percent_correct1;
 
     #get class 2 error rate
@@ -211,10 +219,10 @@ while(epoch < p['total_epochs']):
     neterror2 = net.error
     net_classes2 = net.output
     num_correct2 = sum(np.equal(np.argmax(net_classes2,0),np.argmax(class_data2,0)))
-    percent_correct2 = num_correct2/float(2*examples_per_class)
+    percent_correct2 = num_correct2/float(num_classes*examples_per_class)
     percent_miss2 = 1.0 - percent_correct2;
 
-    if((dump_to_file or epoch%frameskip == 0) and epoch > 47):
+    if((dump_to_file or epoch%frameskip == 0)):
         xv, yv = np.meshgrid(np.linspace(vx_axis[0],vx_axis[1],img_width),np.linspace(vy_axis[0],vy_axis[1],img_height))
         xv = np.reshape((xv),(img_height*img_width))
         yv = np.reshape((yv),(img_height*img_width))
@@ -262,7 +270,7 @@ while(epoch < p['total_epochs']):
                 y1[i] = m*vx_axis[0] + b;
                 x2[i] = vx_axis[1];
                 y2[i] = m*vx_axis[1] + b;
-        plt.drawLine(x1,x2,y1,y2,color=(0,0,0))
+#        plt.drawLine(x1,x2,y1,y2,color=(0,0,0))
         plt.drawRect(0,620,0,35,color=(1,1,1),use_image_coords=True)
         plt.drawText(1,1,"epoch: " + str(epoch),color=(0,0,0),use_image_coords=True)
         plt.drawText(120,1,"P1 Miss percent: " + str(percent_miss1),color=(0,0,0),use_image_coords=True)
