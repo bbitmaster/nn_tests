@@ -11,9 +11,6 @@ data_dir = '../data/'
 
 use_float32=True
 
-incorrect_target = 0.0
-correct_target = 1.0
-
 num_hidden = 1000
 
 activation_function='linear'
