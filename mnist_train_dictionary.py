@@ -41,7 +41,8 @@ def load_data(digits,dataset,p):
     sample_data = images.reshape(train_size,28*28)
 
     #build classification data in the form of neuron outputs
-    class_data = np.ones((labels.shape[0],10))*p['incorrect_target']
+    incorrect_target = -1;
+    class_data = np.ones((labels.shape[0],10))*incorrect_target
     for i in range(labels.shape[0]):
         class_data[i,labels[i]] = 1.0;
 
@@ -123,7 +124,9 @@ layers.append(nnet.layer(28*28,
 #init net
 net = nnet.net(layers)
 
-net.layer[0].centroids = np.asarray((((np.random.random((net.layer[0].weights.shape)) - 0.5)*2.0)),np.float32)
+net.layer[0].centroids = centroids
+net.layer[0].centroids = np.append(net.layer[0].centroids,np.ones((1,net.layer[0].centroids.shape[1]),dtype=net.layer[0].centroids.dtype),axis=0)
+net.layer[0].centroids = np.append(net.layer[0].centroids,np.ones((net.layer[0].centroids.shape[0],1),dtype=net.layer[0].centroids.dtype),axis=1)
 net.layer[0].select_func = csf.select_names[p['cluster_func']]
 net.layer[0].centroid_speed = p['cluster_speed']
 net.layer[0].num_selected = p['clusters_selected']
@@ -162,7 +165,7 @@ for i in range(training_epochs):
     if(i%save_epoch == 0 and i > 0):
         print('saving results...');
         f = h5.File(p['data_dir'] + 'mnist_saved_centroids_' + str(num_centroids) + '.h5py','w')
-        f['centroids'] = centroids
+        f['centroids'] = net.layer[0].centroids
         f['weights_0'] = net.layer[0].weights
         f['weights_1'] = net.layer[1].weights
         f['epoch'] = i
