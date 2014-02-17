@@ -38,9 +38,9 @@ center_y_list2 = np.cos(angles2*np.pi/180.)*0.7
 
 examples_per_class = 30
 spread = 0.05
-dump_to_file = False
-dump_path = "/local_scratch/clustersimpletest1/"
-frameskip = 20;
+dump_to_file = True
+dump_path = "/local_scratch/clustersimpletest_6classes_nomove/"
+frameskip = 1;
 
 img_width = 720
 img_height = 360

@@ -2,8 +2,11 @@ import numpy as np
 
 def cluster_select_func(self,params):
     num_selected = self.num_selected
-    self.distances = np.sum(self.centroids**2,1)[:,np.newaxis] - 2*np.dot(self.centroids,self.input) + \
-                  np.sum(self.input**2,0)[np.newaxis,:]
+    if(hasattr(self,'do_cosinedistance')):
+        self.distances = -np.dot(self.centroids,self.input)/(np.sqrt(np.sum(self.centroids**2.,1)[:,np.newaxis]*np.sum(self.input**2.,0)[np.newaxis,:]))
+    else:
+        self.distances = np.sum(self.centroids**2,1)[:,np.newaxis] - 2*np.dot(self.centroids,self.input) + \
+                        np.sum(self.input**2,0)[np.newaxis,:]
 
     distances_sorted = np.sort(self.distances,axis=0)
     self.selected_neurons = self.distances > distances_sorted[num_selected,:]

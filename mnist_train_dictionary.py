@@ -70,8 +70,13 @@ def do_kmeans(sample_data):
     matching = 0
     while num_iters < max_iters:
         #find the clusters that belong
-        distances = np.sum(centroids**2,1)[:,np.newaxis] - 2*np.dot(centroids,sample_data.transpose()) + \
-                np.sum(sample_data.transpose()**2,0)[np.newaxis,:]
+        if(p['do_cosinedistance']):
+            #we use NEGATIVE cosine distance so the argmin function works properly. (otherwise it would be argmax)
+            distances = -np.dot(centroids,sample_data.transpose())/(np.sqrt(np.sum(centroids**2.,1)[:,np.newaxis]* \
+            np.sum(sample_data.transpose()**2.,0)[np.newaxis,:]))
+        else:
+            distances = np.sum(centroids**2,1)[:,np.newaxis] - 2*np.dot(centroids,sample_data.transpose()) + \
+                        np.sum(sample_data.transpose()**2,0)[np.newaxis,:]
         distances_indices = np.argmin(distances,axis=0);
         if(num_iters > 0):
             matching = np.sum(distances_indices == distances_indices_old)
@@ -89,7 +94,7 @@ def do_kmeans(sample_data):
             break
     return(centroids)
 
-if(os.path.exists(p['data_dir'] + 'mnist_initial_centroids_' + str(num_centroids) + '.h5py')):
+if(p['load_centroids'] and os.path.exists(p['data_dir'] + 'mnist_initial_centroids_' + str(num_centroids) + '.h5py')):
     f = h5.File(p['data_dir'] + 'mnist_initial_centroids_' + str(num_centroids) + '.h5py','r')
     centroids = np.array(f['centroids'])
     print('centroid data loaded. Shape: ' + str(centroids.shape))
@@ -123,7 +128,8 @@ layers.append(nnet.layer(28*28,
 
 #init net
 net = nnet.net(layers)
-
+if(p['do_cosinedistance']):
+    net.layer[0].do_cosinedistance = True
 net.layer[0].centroids = centroids
 net.layer[0].centroids = np.append(net.layer[0].centroids,np.ones((1,net.layer[0].centroids.shape[1]),dtype=net.layer[0].centroids.dtype),axis=0)
 net.layer[0].centroids = np.append(net.layer[0].centroids,np.ones((net.layer[0].centroids.shape[0],1),dtype=net.layer[0].centroids.dtype),axis=1)
@@ -132,9 +138,13 @@ net.layer[0].centroid_speed = p['cluster_speed']
 net.layer[0].num_selected = p['clusters_selected']
 
 training_epochs = p['training_epochs']
-save_epoch = p['save_epoch']
+
+mse_list = []
 
 minibatch_size = p['minibatch_size']
+save_interval = p['save_interval']
+save_and_exit=False
+save_time = time.time()
 for i in range(training_epochs):
     train_size = sample_data.shape[0]
     minibatch_count = int(train_size/minibatch_size)
@@ -161,15 +171,21 @@ for i in range(training_epochs):
 
     train_mse = float(train_mse)/float(train_size)
     print("epoch " + str(i) + " mse " + str(train_mse));
-
-    if(i%save_epoch == 0 and i > 0):
+    mse_list.append(train_mse)
+    if(time.time() - save_time > save_interval or i == training_epochs-1 or save_and_exit==True):
         print('saving results...');
-        f = h5.File(p['data_dir'] + 'mnist_saved_centroids_' + str(num_centroids) + '.h5py','w')
+        f = h5.File(str(p['results_dir']) + str(p['simname']) + '_' + str(p['version']) + '.h5py','w')
         f['centroids'] = net.layer[0].centroids
         f['weights_0'] = net.layer[0].weights
         f['weights_1'] = net.layer[1].weights
         f['epoch'] = i
+        f['mse_list'] = np.array(mse_list)
+        #iterate through all parameters and save them in the parameters group
+        p_group = f.create_group('parameters');
+        for param in p.iteritems():
+            #only save the ones that have a data type that is supported
+            if(type(param[1]) in (int,float,str)):
+                p_group[param[0]] = param[1];
         f.close()
-
-
+        save_time = time.time()
 

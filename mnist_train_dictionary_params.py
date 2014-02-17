@@ -9,6 +9,10 @@ results_dir = '../results/'
 
 data_dir = '../data/'
 
+load_centroids = False
+do_cosinedistance = True
+save_interval = 30*60
+
 use_float32=True
 
 num_hidden = 1000
@@ -48,5 +52,4 @@ initialization_constant=1.0
 initialization_constant_final=1.0
 
 random_seed = 4;
-save_epoch = 4
 
