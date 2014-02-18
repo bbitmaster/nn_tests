@@ -69,9 +69,9 @@ def gen_random_centers(num_classes,num_tries,threshold):
 
 examples_per_class = 30
 spread = 0.05
-dump_to_file = True
+dump_to_file = False
 dump_path = "/local_scratch/clustersimpletest_6classes_nomove/"
-frameskip = 1;
+frameskip = 50;
 
 img_width = 720
 img_height = 360

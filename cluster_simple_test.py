@@ -282,11 +282,12 @@ while(epoch < p['total_epochs']):
             plt.drawText(1,18,"P1 Training ",color=(0.5,0.5,0.0),use_image_coords=True)
         else:
             plt.drawText(1,18,"P2 Training",color=(0.5,0.5,0.0),use_image_coords=True)
-        plt.drawRect(100,190,340,360,color=(1,1,1),use_image_coords=True)
-        plt.drawText(100,341,"P2 Data",color=(0.0,0.0,0.0),use_image_coords=True)
         
-        plt.drawRect(450,540,340,360,color=(1,1,1),use_image_coords=True)
-        plt.drawText(450,341,"P1 Data",color=(0.0,0.0,0.0),use_image_coords=True)
+        #plt.drawRect(100,190,340,360,color=(1,1,1),use_image_coords=True)
+        #plt.drawText(100,341,"P2 Data",color=(0.0,0.0,0.0),use_image_coords=True)
+        
+        #plt.drawRect(450,540,340,360,color=(1,1,1),use_image_coords=True)
+        #plt.drawText(450,341,"P1 Data",color=(0.0,0.0,0.0),use_image_coords=True)
     print("epoch: " + str(epoch) + 
 		  " P1 percent: " + str(percent_miss1) + " P1 MSE: " + str(np.sum(neterror1**2)) +
 		  " P2 percent: " + str(percent_miss2) + " P2 MSE: " + str(np.sum(neterror2**2)))
