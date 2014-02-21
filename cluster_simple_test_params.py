@@ -99,14 +99,14 @@ sparse_target=None
 learning_rate =       0.01
 learning_rate_final = 0.01
 
-forget_epochs = 200
+forget_epochs = 500
 training_epochs = 3000
 total_epochs = 3000
 
 #can be normal or weighted
 #cluster_func = 'cluster_func'
 cluster_func = 'cluster_func'
-cluster_speed = 0.00
+cluster_speed = 0.01
 clusters_selected = 8
 
 dropout=None

@@ -72,6 +72,7 @@ if(p.has_key('cluster_func') and p['cluster_func'] is not None):
     net.layer[0].select_func = csf.select_names[p['cluster_func']]
     net.layer[0].centroid_speed = p['cluster_speed']
     net.layer[0].num_selected = p['clusters_selected']
+    net.layer[0].do_weighted_euclidean = True
 
 #Generate Random Classes
 sample_data1 = np.zeros([2,num_classes*examples_per_class])
@@ -187,10 +188,12 @@ while(epoch < p['total_epochs']):
             
             #replace centroids with new ones drawn from samples
             net.layer[0].centroids[replace_indices,:] = samples.transpose()
+            net.layer[0].centroids[replace_indices,:] = net.layer[0].centroids[replace_indices,:]*net.layer[0].weights[replace_indices,:]
+
             #reset centroid mean
             label_mean[:,l] = sample_data_mean_tmp[l]
             label_var[:,l] = sample_data_var_tmp[l]
-
+    print(net.layer[0].weights[replace_indices,:])
 
 
 

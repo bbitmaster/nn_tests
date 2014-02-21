@@ -2,12 +2,15 @@ import numpy as np
 
 def cluster_select_func(self,params):
     num_selected = self.num_selected
-    if(hasattr(self,'do_cosinedistance')):
+    if(hasattr(self,'do_weighted_euclidean')):
+        self.distances = np.sum(self.centroids**2,1)[:,np.newaxis] \
+                         - 2*np.dot(self.centroids*self.weights,self.input) \
+                         + np.dot(self.weights**2,self.input**2)
+    elif(hasattr(self,'do_cosinedistance')):
         self.distances = -np.dot(self.centroids,self.input)/(np.sqrt(np.sum(self.centroids**2.,1)[:,np.newaxis]*np.sum(self.input**2.,0)[np.newaxis,:]))
     else:
         self.distances = np.sum(self.centroids**2,1)[:,np.newaxis] - 2*np.dot(self.centroids,self.input) + \
                         np.sum(self.input**2,0)[np.newaxis,:]
-
     distances_sorted = np.sort(self.distances,axis=0)
     self.selected_neurons = self.distances > distances_sorted[num_selected,:]
     
@@ -19,6 +22,10 @@ def cluster_select_func(self,params):
     self.centroids_prime = (np.dot(self.input,(~self.selected_neurons).transpose())/ \
                       np.sum(~self.selected_neurons,1)).transpose()
     self.centroids_prime[np.isnan(self.centroids_prime)] = self.centroids[np.isnan(self.centroids_prime)]
+    
+    if(hasattr(self,'do_weighted_euclidean')):
+        print("Weighted Euclidean2")
+        self.centroids_prime = self.centroids_prime*self.weights;
 
     self.output[self.selected_neurons] = 0;
 
