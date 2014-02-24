@@ -15,6 +15,7 @@ use_float32=True
 incorrect_target = -1.0
 correct_target = 1.0
 
+do_weighted_euclidean = False
 #num_classes = 2;
 
 #center_x_list1 = [0.7,  0.7]
@@ -38,7 +39,8 @@ def get_centers_from_angles(num_classes):
     center_y_list2 = np.cos(angles2*np.pi/180.)*0.7
     return (center_x_list1,center_y_list1,center_x_list2,center_y_list2)
 
-
+#make sure clusters init in same location
+np.random.seed(1);
 def gen_random_centers(num_classes,num_tries,threshold):
     center_x_list = []
     center_y_list = []
@@ -99,15 +101,16 @@ sparse_target=None
 learning_rate =       0.01
 learning_rate_final = 0.01
 
-forget_epochs = 500
+forget_epochs = 200
 training_epochs = 3000
 total_epochs = 3000
 
 #can be normal or weighted
 #cluster_func = 'cluster_func'
 cluster_func = 'cluster_func'
-cluster_speed = 0.01
-clusters_selected = 8
+cluster_speed = 0.00
+clusters_selected = 4
+new_clusters_placed = 8
 
 dropout=None
 

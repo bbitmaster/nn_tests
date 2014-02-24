@@ -72,7 +72,8 @@ if(p.has_key('cluster_func') and p['cluster_func'] is not None):
     net.layer[0].select_func = csf.select_names[p['cluster_func']]
     net.layer[0].centroid_speed = p['cluster_speed']
     net.layer[0].num_selected = p['clusters_selected']
-    net.layer[0].do_weighted_euclidean = True
+    if(p.has_key('do_weighted_euclidean') and p['do_weighted_euclidean']):
+        net.layer[0].do_weighted_euclidean = True
 
 #Generate Random Classes
 sample_data1 = np.zeros([2,num_classes*examples_per_class])
@@ -128,15 +129,21 @@ if(not dump_to_file):
 epoch = 1;
 
 #init variables for estimating label mean and standard deviation
+number_to_replace = p['new_clusters_placed']
 mean_alpha = 0.9
 var_alpha = 0.9
+error_difference_threshold = 1.5
 
-sample_data_tmp = np.zeros((num_classes,2,30),dtype=np.float32)
-sample_data_mean_tmp = np.zeros((num_classes,2),dtype=np.float32)
-sample_data_var_tmp = np.zeros((num_classes,2),dtype=np.float32)
-label_mean = np.zeros((2,num_classes),dtype=np.float32)
-label_var = np.ones((2,num_classes),dtype=np.float32)
-membership = np.ones(num_classes,dtype=np.float32)
+error_mean = np.zeros((num_classes,1),dtype=np.float32)
+error_mean_avg = np.ones((num_classes,1),dtype=np.float32)*.001
+error_mean_difference = np.zeros((num_classes,1),dtype=np.float32)
+
+#sample_data_tmp = np.zeros((num_classes,2,30),dtype=np.float32)
+#sample_data_mean_tmp = np.zeros((num_classes,2),dtype=np.float32)
+#sample_data_var_tmp = np.zeros((num_classes,2),dtype=np.float32)
+#label_mean = np.zeros((2,num_classes),dtype=np.float32)
+#label_var = np.ones((2,num_classes),dtype=np.float32)
+#membership = np.ones(num_classes,dtype=np.float32)
 
 while(epoch < p['total_epochs']):
 
@@ -152,56 +159,92 @@ while(epoch < p['total_epochs']):
     net.input = train_sample_data;
     net.feed_forward()
     
-#    np.savetxt("dmp/distances_epoch" + str(epoch) + ".csv",net.layer[0].distances,delimiter=",");
-#    asdf
-#    print("Neuron 1 Centroid 11")
-#    print(str(self.layer[0].input[:,1]);
-#    print(str(self.layer[0].input[:,1]);
+    net.error = net.output - train_class_data
+    neterror = net.error
+    net_classes = net.output
+
+    net.back_propagate()
     for l in range(num_classes):
+    #get a mask that tells which elements refer to this label
         mask = np.equal(l,np.argmax(train_class_data,0))
-        sample_data_tmp[l] = train_sample_data[:,mask]
-        sample_data_mean_tmp[l] = np.mean(sample_data_tmp[l],1)
-        sample_data_var_tmp[l] = np.var(sample_data_tmp[l],1)
-#compute membership
-#note: this assumes imput dimension of 2-- need to change for larger inputs
-        membership[l] = scipy.stats.norm.pdf(sample_data_mean_tmp[l,0],label_mean[0,l],np.sqrt(label_var[0,l]))
-        membership[l] *= scipy.stats.norm.pdf(sample_data_mean_tmp[l,1],label_mean[1,l],np.sqrt(label_var[1,l]))
-        label_mean[:,l] = mean_alpha*label_mean[:,l] + (1.0 - mean_alpha)*sample_data_mean_tmp[l]
-        label_var[:,l] = var_alpha*label_var[:,l] + (1.0 - var_alpha)*sample_data_var_tmp[l]
-        print("label: " + str(l) + " mean: " + str(label_mean[:,l]) + " var: " + str(label_var[:,l]) + " membership: " + str(membership[l]))
+    #get the mean squared error for this label
+        error_mean[l] = np.mean(net.error[:,mask]**2)
+        #if error goes up, difference will be positive
+        error_mean_difference[l] = error_mean[l]/error_mean_avg[l]
 
+        error_mean_avg[l] = var_alpha*error_mean_avg[l] + (1.0 - var_alpha)*error_mean[l]
 
-    number_to_replace = 16
-    neuron_used_indices = net.layer[0].selected_count.argsort()
-    for l in range(6):
-        if(membership[l] < .2):
-            print("MEMBERSHIP EXCEEDED THRESHOLD FOR LABEL " + str(l))
+    neuron_used_indices = net.layer[0].eligibility_count.argsort()
+    for l in range(num_classes):
+        print("error" + str(l) + ": " + str(error_mean[l]) + " avg " + str(error_mean_avg[l]) + " difference " + str(error_mean_difference[l]))
+        if(error_mean_difference[l] > error_difference_threshold):
+            print("ERROR EXCEEDED THRESHOLD FOR LABEL " + str(l))
             #get the 8 least selected neurons
             replace_indices = neuron_used_indices[0:number_to_replace]
             neuron_used_indices = neuron_used_indices[number_to_replace:]
             #need 8 sample data points -- could use k-means -- for now sample randomly
             #samples is S x N where S is number os samples, and N is input size
-            samples = sample_data_tmp[l][:,0:number_to_replace]
+            mask = np.equal(l,np.argmax(train_class_data,0))
+            sample_data_tmp = train_sample_data[:,mask]
+            samples = sample_data_tmp[:,0:number_to_replace]
 
             #need to tack on the bias
             samples = np.append(samples,np.ones((1,samples.shape[1]),dtype=samples.dtype),axis=0)
             
             #replace centroids with new ones drawn from samples
             net.layer[0].centroids[replace_indices,:] = samples.transpose()
-            net.layer[0].centroids[replace_indices,:] = net.layer[0].centroids[replace_indices,:]*net.layer[0].weights[replace_indices,:]
+            if(p.has_key('do_weighted_euclidean') and p['do_weighted_euclidean']):
+                net.layer[0].centroids[replace_indices,:] = net.layer[0].centroids[replace_indices,:]*net.layer[0].weights[replace_indices,:]
 
-            #reset centroid mean
-            label_mean[:,l] = sample_data_mean_tmp[l]
-            label_var[:,l] = sample_data_var_tmp[l]
-    print(net.layer[0].weights[replace_indices,:])
+            #reset error mean
+            #add a bit of a bias, to ensure it doesn't exceed the threshold immediately again
+            error_mean_avg[l] = error_mean[l] + 1.0
+
+#    np.savetxt("dmp/distances_epoch" + str(epoch) + ".csv",net.layer[0].distances,delimiter=",");
+#    asdf
+#    print("Neuron 1 Centroid 11")
+#    print(str(self.layer[0].input[:,1]);
+#    print(str(self.layer[0].input[:,1]);
+#    for l in range(num_classes):
+#        mask = np.equal(l,np.argmax(train_class_data,0))
+#        sample_data_tmp[l] = train_sample_data[:,mask]
+#        sample_data_mean_tmp[l] = np.mean(sample_data_tmp[l],1)
+#        sample_data_var_tmp[l] = np.var(sample_data_tmp[l],1)
+#compute membership
+#note: this assumes imput dimension of 2-- need to change for larger inputs
+#        membership[l] = scipy.stats.norm.pdf(sample_data_mean_tmp[l,0],label_mean[0,l],np.sqrt(label_var[0,l]))
+#        membership[l] *= scipy.stats.norm.pdf(sample_data_mean_tmp[l,1],label_mean[1,l],np.sqrt(label_var[1,l]))
+#        label_mean[:,l] = mean_alpha*label_mean[:,l] + (1.0 - mean_alpha)*sample_data_mean_tmp[l]
+#        label_var[:,l] = var_alpha*label_var[:,l] + (1.0 - var_alpha)*sample_data_var_tmp[l]
+#        print("label: " + str(l) + " mean: " + str(label_mean[:,l]) + " var: " + str(label_var[:,l]) + " membership: " + str(membership[l]))
 
 
+#    number_to_replace = p['new_clusters_placed']
+#    neuron_used_indices = net.layer[0].selected_count.argsort()
+#    for l in range(6):
+#        if(membership[l] < .2):
+#            print("MEMBERSHIP EXCEEDED THRESHOLD FOR LABEL " + str(l))
+#            #get the 8 least selected neurons
+#            replace_indices = neuron_used_indices[0:number_to_replace]
+#            neuron_used_indices = neuron_used_indices[number_to_replace:]
+#            #need 8 sample data points -- could use k-means -- for now sample randomly
+#            #samples is S x N where S is number os samples, and N is input size
+#            samples = sample_data_tmp[l][:,0:number_to_replace]
+#
+#            #need to tack on the bias
+#            samples = np.append(samples,np.ones((1,samples.shape[1]),dtype=samples.dtype),axis=0)
+#            
+#            #replace centroids with new ones drawn from samples
+#            net.layer[0].centroids[replace_indices,:] = samples.transpose()
+#            if(p.has_key('do_weighted_euclidean') and p['do_weighted_euclidean']):
+#                net.layer[0].centroids[replace_indices,:] = net.layer[0].centroids[replace_indices,:]*net.layer[0].weights[replace_indices,:]
+#
+#            #reset centroid mean
+#            label_mean[:,l] = sample_data_mean_tmp[l]
+#            label_var[:,l] = sample_data_var_tmp[l]
+#    #print(net.layer[0].weights[replace_indices,:])
 
-    net.error = net.output - train_class_data
-    neterror = net.error
-    net_classes = net.output
 
-    net.back_propagate()
     net.update_weights()
     if(p['cluster_func'] is not None):
         csf.update_names[p['cluster_func']](net.layer[0])
