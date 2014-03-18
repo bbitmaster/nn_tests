@@ -75,14 +75,49 @@ def normalize_data(data,means,stds):
     data_reduced[data_reduced < -1.5] = -1.5
     return data_reduced
 
+P1_list = list(p['P1_list'][1:])
+P1_list = [int(x) for x in P1_list]
+P2_list = list(p['P2_list'][1:])
+P2_list = [int(x) for x in P2_list]
+total_list = P1_list + P2_list
+
 print("Loading Data...")
 #get only first 4 digits
-(data_full,class_data) = load_data((1,2,3,4),"training",p)
-(test_data_full,test_class_data) = load_data((1,2,3,4),"testing",p)
+(data_full,class_data) = load_data(tuple(total_list),"training",p)
+(test_data_full,test_class_data) = load_data(tuple(total_list),"testing",p)
 train_size = data_full.shape[0]
+
+print("Splitting classes")
+#Only get classes for 1,2,3,4
+#class_data = class_data[:,1:5]
+#test_class_data = test_class_data[:,1:5]
+
+#split data into two parts P1 and P2, based on class
+P1_mask = (np.argmax(class_data,axis=1) == P1_list[0])
+for d in P1_list:
+    P1_mask = np.logical_or(P1_mask,(np.argmax(class_data,axis=1) == d))
+
+P2_mask = (np.argmax(class_data,axis=1) == P2_list[0])
+for d in P2_list:
+    P2_mask = np.logical_or(P2_mask,(np.argmax(class_data,axis=1) == d))
+
+#split test into two parts P1 and P2 based on Class
+P1_test_mask = (np.argmax(test_class_data,axis=1) == P1_list[0])
+for d in P1_list:
+    P1_test_mask = np.logical_or(P1_test_mask,(np.argmax(test_class_data,axis=1) == d))
+
+P2_test_mask = (np.argmax(test_class_data,axis=1) == P2_list[0])
+for d in P2_list:
+    P2_test_mask = np.logical_or(P2_test_mask,(np.argmax(test_class_data,axis=1) == d))
+
+num_labels = len(P1_list)
+
+print("P1 Samples: " + str(np.sum(P1_mask)) + " P2 Samples: " + str(np.sum(P2_mask)))
+print("P2 Test Samples: " + str(np.sum(P1_test_mask)) + " P2 Test Samples: " + str(np.sum(P2_test_mask)))
 
 print("Doing PCA Reduction...")
 reduce_to = p['reduce_to']
+
 #pca reduce
 (pca_transform,data_means) = pca_reduce(data_full)
 data_reduced = np.dot(data_full,pca_transform[:,0:reduce_to])
@@ -95,21 +130,17 @@ pca_data_std = np.std(data_reduced,axis=0)
 data_reduced = normalize_data(data_reduced,pca_data_means,pca_data_std)
 test_data_reduced = normalize_data(test_data_reduced,pca_data_means,pca_data_std)
 
-
-print("Splitting classes")
-#Only get classes for 1,2,3,4
-class_data = class_data[:,1:5]
-test_class_data = test_class_data[:,1:5]
-
-#split data into two parts P1 and P2, based on class
-P1_mask = np.argmax(class_data,axis=1) < 2
-P2_mask = np.argmax(class_data,axis=1) >= 2
-
 sample_data1 = data_reduced[P1_mask,:]
 sample_data2 = data_reduced[P2_mask,:]
 
 class_data1 = class_data[P1_mask,:]
 class_data2 = class_data[P2_mask,:]
+
+class_data1 = class_data1.transpose()
+class_data2 = class_data2.transpose()
+
+class_data1 = class_data1[P1_list,:]
+class_data2 = class_data2[P2_list,:]
 
 #make size of P1 and P2 the same size
 #sample_size = min(sample_data1.shape[0],sample_data2.shape[0])
@@ -118,18 +149,17 @@ class_data2 = class_data[P2_mask,:]
 #class_data1 = class_data1[0:sample_size]
 #class_data2 = class_data2[0:sample_size]
 
-#split test into two parts P1 and P2 based on Class
-P1_test_mask = np.argmax(test_class_data,axis=1) < 2
-P2_test_mask = np.argmax(test_class_data,axis=1) >= 2
-
 test_data1 = test_data_reduced[P1_test_mask,:]
 test_data2 = test_data_reduced[P2_test_mask,:]
 
 test_class_data1 = test_class_data[P1_test_mask,:]
 test_class_data2 = test_class_data[P2_test_mask,:]
 
+test_class1 = test_class_data1.transpose()
+test_class2 = test_class_data2.transpose()
 
-
+test_class1 = test_class1[P1_list,:]
+test_class2 = test_class2[P2_list,:]
 print("Network Initialization...")
 
 num_hidden = p['num_hidden']
@@ -137,7 +167,6 @@ num_hidden = p['num_hidden']
 training_epochs = p['training_epochs']
 
 minibatch_size = p['minibatch_size']
-
 
 layers = [];
 layers.append(nnet.layer(reduce_to))
@@ -165,7 +194,7 @@ if(p.has_key('num_hidden3')):
                              sparse_target=p['sparse_target3'],use_float32=p['use_float32'],
                              momentum=p['momentum3'],maxnorm=p['maxnorm3'],step_size=p['learning_rate3']))
 
-layers.append(nnet.layer(2,p['activation_function_final'],use_float32=p['use_float32'],
+layers.append(nnet.layer(num_labels,p['activation_function_final'],use_float32=p['use_float32'],
                              step_size=p['learning_rate_final'],momentum=p['momentum_final']))
 
 np.random.seed(p['random_seed']);
@@ -174,7 +203,8 @@ np.random.seed(p['random_seed']);
 net = nnet.net(layers)
 
 if(p.has_key('cluster_func') and p['cluster_func'] is not None):
-    net.layer[0].centroids = np.asarray((((np.random.random((net.layer[0].weights.shape)) - 0.5)*2.0)),np.float32)
+#    net.layer[0].centroids = np.asarray((((np.random.random((net.layer[0].weights.shape)) - 0.5)*2.0)),np.float32)
+    net.layer[0].centroids = np.asarray(((np.ones((net.layer[0].weights.shape))*10.0)),np.float32)
     net.layer[0].select_func = csf.select_names[p['cluster_func']]
     print('cluster_func: ' + str(csf.select_names[p['cluster_func']]))
     net.layer[0].centroid_speed = p['cluster_speed']
@@ -182,7 +212,6 @@ if(p.has_key('cluster_func') and p['cluster_func'] is not None):
     if(p.has_key('do_cosinedistance') and p['do_cosinedistance']):
         net.layer[0].do_cosinedistance = True
         print('cosine set to true')
-
 
 if(p.has_key('cluster_func2') and p['cluster_func2'] is not None):
     net.layer[1].centroids = np.asarray((((np.random.random((net.layer[1].weights.shape)) - 0.5)*2.0)),np.float32)
@@ -224,17 +253,11 @@ shuffle_rate = p['shuffle_rate'];
 training_mode = MODE_P1
 (sample_data,class_data) = (sample_data1,class_data1)
 
-test_class1 = test_class_data1.transpose()
-test_class2 = test_class_data2.transpose()
-
-test_class1 = test_class1[0:2,:]
-test_class2 = test_class2[2:4,:]
 
 save_and_exit=False
 t = time.time()
 
 print("init centroid detection stuff")
-num_labels = 2
 error_mean = np.zeros((num_labels,1),dtype=np.float32)
 error_mean_avg = np.ones((num_labels,1),dtype=np.float32)*.001
 error_mean_difference = np.zeros((num_labels,1),dtype=np.float32)
@@ -268,7 +291,7 @@ for i in range(training_epochs):
     rng_state = np.random.get_state();
     np.random.shuffle(sample_data)
     np.random.set_state(rng_state)
-    np.random.shuffle(class_data)
+    np.random.shuffle(class_data.transpose())
     
     #count number of correct
     train_missed = 0.0;
@@ -277,11 +300,12 @@ for i in range(training_epochs):
         #grab a minibatch
         train_sample_data = np.transpose(sample_data[j*minibatch_size:(j+1)*minibatch_size])
         net.input = train_sample_data
-        classification = np.transpose(class_data[j*minibatch_size:(j+1)*minibatch_size]) 
-        if(training_mode == MODE_P1):
-            classification = classification[0:2,:]
-        elif(training_mode == MODE_P2):
-            classification = classification[2:4,:]
+        classification = class_data[:,j*minibatch_size:(j+1)*minibatch_size]
+        #classification = np.transpose(class_data[j*minibatch_size:(j+1)*minibatch_size]) 
+        #if(training_mode == MODE_P1):
+        #    classification = classification[0:2,:]
+        #elif(training_mode == MODE_P2):
+        #    classification = classification[2:4,:]
         net.feed_forward()
         net.error = net.output - classification
         guess = np.argmax(net.output,0)
@@ -308,6 +332,7 @@ for i in range(training_epochs):
                     print("ERROR EXCEEDED TRESHOLD FOr LABEL " + str(l))
                     #get the 8 least selected neurons
                     replace_indices = neuron_used_indices[0:number_to_replace]
+                    #print("replace indices: " + str(replace_indices))
                     neuron_used_indices = neuron_used_indices[number_to_replace:]
                     #need some sample data points -- could use k-means -- for now sample randomly
                     #samples is S x N where S is number of samples, and N is input size
@@ -328,9 +353,11 @@ for i in range(training_epochs):
                     error_mean_avg[l] = error_mean[l] + 1.0
 
 #    np.savetxt("dmp/distances_epoch" + str(epoch) + ".csv",net.layer[0].distances,delimiter=",");
-#    asdf
-
+        #print(net.layer[0].saved_selected_neurons)
         net.update_weights()
+#        print("selected is zero: " + str( np.sum(net.layer[0].saved_selected_neurons == 0,axis=0)))
+#        print("output is not zero: " + str( np.sum(net.layer[0].output != 0,axis=0)))
+#        import pdb; pdb.set_trace();
         #update cluster centroids
         for k in range(len(net.layer)):
             str_list = ("","2","3")
@@ -340,7 +367,6 @@ for i in range(training_epochs):
 
     train_mse = float(train_mse)/float(train_size)
     train_missed_percent = float(train_missed)/float(train_size)
-
     net.train = False
 
     #feed test set through to get test 1 rates

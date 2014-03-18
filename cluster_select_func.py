@@ -20,7 +20,6 @@ def cluster_select_func(self,params):
     distances_sorted = np.sort(self.distances,axis=0)
 #    print("distances_sorted " + str(distances_sorted[0:10,0]))
     self.selected_neurons = self.distances > distances_sorted[num_selected,:]
-
     #keep track of this so we can count the number of times a centroid was selected
     self.saved_selected_neurons = np.copy(self.selected_neurons)
     
