@@ -14,6 +14,8 @@ use_float32=True
 incorrect_target = -1.0
 correct_target = 1.0
 
+skip_pca = True
+
 P1_list='L142'
 P2_list='L978'
 

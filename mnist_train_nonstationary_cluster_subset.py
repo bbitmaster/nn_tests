@@ -52,7 +52,7 @@ def load_data(digits,dataset,p):
     if(p['use_float32']):
         sample_data = np.asarray(sample_data,np.float32)
         class_data = np.asarray(class_data,np.float32)
-        
+
     return (sample_data,class_data)
 
 def pca_reduce(data):
@@ -125,10 +125,16 @@ test_data_reduced = np.dot(test_data_full,pca_transform[:,0:reduce_to])
 
 print("Normalizing...")
 #we should normalize the pca reduced data
-pca_data_means = np.mean(data_reduced,axis=0)
-pca_data_std = np.std(data_reduced,axis=0)
-data_reduced = normalize_data(data_reduced,pca_data_means,pca_data_std)
-test_data_reduced = normalize_data(test_data_reduced,pca_data_means,pca_data_std)
+if(p.has_key('skip_pca') and p['skip_pca'] == True):
+    print("Skipping PCA Reduction...")
+    data_reduced = data_full
+    test_data_reduced = test_data_full
+    reduce_to = 28*28;
+else:
+    pca_data_means = np.mean(data_reduced,axis=0)
+    pca_data_std = np.std(data_reduced,axis=0)
+    data_reduced = normalize_data(data_reduced,pca_data_means,pca_data_std)
+    test_data_reduced = normalize_data(test_data_reduced,pca_data_means,pca_data_std)
 
 sample_data1 = data_reduced[P1_mask,:]
 sample_data2 = data_reduced[P2_mask,:]
@@ -261,6 +267,7 @@ print("init centroid detection stuff")
 error_mean = np.zeros((num_labels,1),dtype=np.float32)
 error_mean_avg = np.ones((num_labels,1),dtype=np.float32)*.001
 error_mean_difference = np.zeros((num_labels,1),dtype=np.float32)
+error_thresh_list = []
 
 number_to_replace = p['number_to_replace']
 error_difference_threshold = p['error_difference_threshold']
@@ -329,7 +336,8 @@ for i in range(training_epochs):
             for l in range(num_labels):
                 #print("error" + str(l) + ": " + str(error_mean[l]) + " avg " + str(error_mean_avg[l]) + " difference " + str(error_mean_difference[l]))
                 if(error_mean_difference[l] > error_difference_threshold):
-                    print("ERROR EXCEEDED TRESHOLD FOr LABEL " + str(l))
+                    print("ERROR EXCEEDED TRESHOLD FOR LABEL " + str(l))
+                    error_thresh_list.append((i,l))
                     #get the 8 least selected neurons
                     replace_indices = neuron_used_indices[0:number_to_replace]
                     #print("replace indices: " + str(replace_indices))
@@ -439,6 +447,7 @@ for i in range(training_epochs):
         f_handle['test_missed_percent2_list'] = np.array(test_missed_percent2_list);
 
         f_handle['training_mode_list'] = np.array(training_mode_list)
+        f_handle['error_thresh_list'] = np.array(error_thresh_list)
    
         #iterate through all parameters and save them in the parameters group
         p_group = f_handle.create_group('parameters');
