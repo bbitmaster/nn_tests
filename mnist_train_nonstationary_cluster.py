@@ -69,9 +69,24 @@ training_epochs = p['training_epochs']
 minibatch_size = p['minibatch_size']
 
 
+if(p.has_key('nodes_per_group')):
+    nodes_per_group = p['nodes_per_group']
+else:
+    nodes_per_group = None
+
+if(p.has_key('nodes_per_group2')):
+    nodes_per_group2 = p['nodes_per_group2']
+else:
+    nodes_per_group2 = None
+
+if(p.has_key('nodes_per_group3')):
+    nodes_per_group3 = p['nodes_per_group3']
+else:
+    nodes_per_group3 = None
+
 layers = [];
 layers.append(nnet.layer(28*28))
-layers.append(nnet.layer(p['num_hidden'],p['activation_function'],
+layers.append(nnet.layer(p['num_hidden'],p['activation_function'],nodes_per_group=nodes_per_group,
                          initialization_scheme=p['initialization_scheme'],
                          initialization_constant=p['initialization_constant'],
                          dropout=p['dropout'],sparse_penalty=p['sparse_penalty'],
@@ -80,7 +95,7 @@ layers.append(nnet.layer(p['num_hidden'],p['activation_function'],
 
 #Add 2nd and 3rd hidden layers if there are parameters indicating that we should
 if(p.has_key('num_hidden2')):
-    layers.append(nnet.layer(p['num_hidden2'],p['activation_function2'],
+    layers.append(nnet.layer(p['num_hidden2'],p['activation_function2'],nodes_per_group=nodes_per_group2,
                              initialization_scheme=p['initialization_scheme2'],
                              initialization_constant=p['initialization_constant2'],
                              dropout=p['dropout2'],sparse_penalty=p['sparse_penalty2'],
@@ -88,7 +103,7 @@ if(p.has_key('num_hidden2')):
                              momentum=p['momentum2'],maxnorm=p['maxnorm2'],step_size=p['learning_rate2']))
 
 if(p.has_key('num_hidden3')):
-    layers.append(nnet.layer(p['num_hidden3'],p['activation_function3'],
+    layers.append(nnet.layer(p['num_hidden3'],p['activation_function3'],nodes_per_group=nodes_per_group3,
                              initialization_scheme=p['initialization_scheme3'],
                              initialization_constant=p['initialization_constant3'],
                              dropout=p['dropout3'],sparse_penalty=p['sparse_penalty3'],
@@ -250,7 +265,7 @@ for i in range(training_epochs):
         net.update_weights()
         #update cluster centroids
         for k in range(len(net.layer)):
-            str_list = ("","2","3")
+            str_list = ("","2","3","4")
             str_to_append = str_list[k]
             if(p.has_key('cluster_func' + str_to_append) and p['cluster_func' + str_to_append] is not None):
                 csf.update_names[p['cluster_func' + str_to_append]](net.layer[k])

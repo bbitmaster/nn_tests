@@ -15,13 +15,17 @@ incorrect_target = 0.0
 correct_target = 1.0
 
 num_hidden = 1000
-#num_hidden2 = 500
-#num_hidden3 = 500
+num_hidden2 = 1000
+num_hidden3 = 1000
 
-activation_function='tanh'
-activation_function2='linear_rectifier'
-activation_function3='linear_rectifier'
-activation_function_final='tanh'
+nodes_per_group=10
+nodes_per_group2=10
+nodes_per_group3=10
+
+activation_function='maxout'
+activation_function2='maxout'
+activation_function3='maxout'
+activation_function_final='softmax'
 
 momentum=0.0
 momentum2=0.0
@@ -53,11 +57,11 @@ training_epochs = 3000
 
 do_weight_restoration = False
 fresh_value_weights = True
-shuffle_rate = 10
+shuffle_rate = 500
 nll_shuffle = None
 
 #can be normal or weighted
-cluster_func = 'cluster_func'
+cluster_func = None
 cluster_func2 = None
 cluster_func3 = None
 
