@@ -1,6 +1,6 @@
 import numpy as np
 
-def cluster_select_func(self,params):
+def cluster_select_func(self):
     num_selected = self.num_selected
     if(hasattr(self,'do_weighted_euclidean')):
         self.distances = np.sum(self.centroids**2,1)[:,np.newaxis] \
@@ -49,7 +49,7 @@ def cluster_update_func(self):
     #print("selected: " + str(self.selected_count))
     #print("eligibility: " + str(self.eligibility_count))
 
-def cluster_select_func_starvation1(self,params):
+def cluster_select_func_starvation1(self):
     num_selected = self.num_selected
     #init starvation if applicable
     if(not hasattr(self,'starvation')):
