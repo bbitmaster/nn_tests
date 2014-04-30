@@ -174,9 +174,24 @@ training_epochs = p['training_epochs']
 
 minibatch_size = p['minibatch_size']
 
+if(p.has_key('nodes_per_group')):
+    nodes_per_group = p['nodes_per_group']
+else:
+    nodes_per_group = None
+
+if(p.has_key('nodes_per_group2')):
+    nodes_per_group2 = p['nodes_per_group2']
+else:
+    nodes_per_group2 = None
+
+if(p.has_key('nodes_per_group3')):
+    nodes_per_group3 = p['nodes_per_group3']
+else:
+    nodes_per_group3 = None
+
 layers = [];
 layers.append(nnet.layer(reduce_to))
-layers.append(nnet.layer(p['num_hidden'],p['activation_function'],
+layers.append(nnet.layer(p['num_hidden'],p['activation_function'],nodes_per_group=nodes_per_group,
                          initialization_scheme=p['initialization_scheme'],
                          initialization_constant=p['initialization_constant'],
                          dropout=p['dropout'],sparse_penalty=p['sparse_penalty'],
@@ -185,7 +200,7 @@ layers.append(nnet.layer(p['num_hidden'],p['activation_function'],
 
 #Add 2nd and 3rd hidden layers if there are parameters indicating that we should
 if(p.has_key('num_hidden2')):
-    layers.append(nnet.layer(p['num_hidden2'],p['activation_function2'],
+    layers.append(nnet.layer(p['num_hidden2'],p['activation_function2'],nodes_per_group=nodes_per_group2,
                              initialization_scheme=p['initialization_scheme2'],
                              initialization_constant=p['initialization_constant2'],
                              dropout=p['dropout2'],sparse_penalty=p['sparse_penalty2'],
@@ -193,7 +208,7 @@ if(p.has_key('num_hidden2')):
                              momentum=p['momentum2'],maxnorm=p['maxnorm2'],step_size=p['learning_rate2']))
 
 if(p.has_key('num_hidden3')):
-    layers.append(nnet.layer(p['num_hidden3'],p['activation_function3'],
+    layers.append(nnet.layer(p['num_hidden3'],p['activation_function3'],nodes_per_group=nodes_per_group3,
                              initialization_scheme=p['initialization_scheme3'],
                              initialization_constant=p['initialization_constant3'],
                              dropout=p['dropout3'],sparse_penalty=p['sparse_penalty3'],
@@ -268,6 +283,7 @@ error_mean = np.zeros((num_labels,1),dtype=np.float32)
 error_mean_avg = np.ones((num_labels,1),dtype=np.float32)*.001
 error_mean_difference = np.zeros((num_labels,1),dtype=np.float32)
 error_thresh_list = []
+error_mean_difference_log = []
 
 number_to_replace = p['number_to_replace']
 error_difference_threshold = p['error_difference_threshold']
@@ -334,8 +350,16 @@ for i in range(training_epochs):
         
             neuron_used_indices = net.layer[0].eligibility_count.argsort()
             for l in range(num_labels):
-                #print("error" + str(l) + ": " + str(error_mean[l]) + " avg " + str(error_mean_avg[l]) + " difference " + str(error_mean_difference[l]))
-                if(error_mean_difference[l] > error_difference_threshold):
+                #if we have threshold_cheat on then it automatically lays down centroids when P1->P2 switch occurs, else try to detect it using threshold
+                exceeded = False
+
+                if(p.has_key('threshold_cheat') and p['threshold_cheat'] is not None):
+                    #on very first minibatch of new epoch, do switch
+                    if((not (i%shuffle_rate)) and j == 0):
+                        exceeded = True
+                elif(error_mean_difference[l] > error_difference_threshold):
+                    exceeded = True
+                if(exceeded):
                     print("ERROR EXCEEDED TRESHOLD FOR LABEL " + str(l))
                     error_thresh_list.append((i,l))
                     #get the 8 least selected neurons
@@ -359,6 +383,8 @@ for i in range(training_epochs):
                     #reset error mean
                     #add a bit of a bias, to ensure it doesn't exceed the threshold immediately again
                     error_mean_avg[l] = error_mean[l] + 1.0
+            #Append error mean difference for each class label to the log
+            error_mean_difference_log.append(np.copy(error_mean_difference));
 
 #    np.savetxt("dmp/distances_epoch" + str(epoch) + ".csv",net.layer[0].distances,delimiter=",");
         #print(net.layer[0].saved_selected_neurons)
@@ -447,7 +473,11 @@ for i in range(training_epochs):
         f_handle['test_missed_percent2_list'] = np.array(test_missed_percent2_list);
 
         f_handle['training_mode_list'] = np.array(training_mode_list)
+
+        #log when error difference exceeded threshold, and the actual error difference
         f_handle['error_thresh_list'] = np.array(error_thresh_list)
+        f_handle['error_mean_difference_log'] = np.array(error_mean_difference_log)
+        f_handle['minibatch_count'] = minibatch_count
    
         #iterate through all parameters and save them in the parameters group
         p_group = f_handle.create_group('parameters');

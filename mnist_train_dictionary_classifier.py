@@ -14,7 +14,7 @@ import h5py as h5
 if(len(sys.argv) > 1):
     params_file = sys.argv[1]
 else:
-    params_file = 'mnist_train_dictionary_params.py'
+    params_file = 'mnist_train_dictionary_classifier_params.py'
     
 p = {}
 execfile(params_file,p)
@@ -41,10 +41,11 @@ def load_data(digits,dataset,p):
     sample_data = images.reshape(train_size,28*28)
 
     #build classification data in the form of neuron outputs
-    incorrect_target = -1;
+    incorrect_target = p['incorrect_target'];
+    correct_target = p['correct_target'];
     class_data = np.ones((labels.shape[0],10))*incorrect_target
     for i in range(labels.shape[0]):
-        class_data[i,labels[i]] = 1.0;
+        class_data[i,labels[i]] = correct_target;
 
     if(p['use_float32']):
         sample_data = np.asarray(sample_data,np.float32)
@@ -131,18 +132,28 @@ layers.append(nnet.layer(10,
 
 #init net
 net = nnet.net(layers)
-if(p['do_cosinedistance']):
-    net.layer[0].do_cosinedistance = True
-net.layer[0].centroids = centroids
-net.layer[0].centroids = np.append(net.layer[0].centroids,np.ones((1,net.layer[0].centroids.shape[1]),dtype=net.layer[0].centroids.dtype),axis=0)
-net.layer[0].centroids = np.append(net.layer[0].centroids,np.ones((net.layer[0].centroids.shape[0],1),dtype=net.layer[0].centroids.dtype),axis=1)
-net.layer[0].select_func = csf.select_names[p['cluster_func']]
-net.layer[0].centroid_speed = p['cluster_speed']
-net.layer[0].num_selected = p['clusters_selected']
+if(p['clusters_selected'] != p['num_centroids']):
+    if(p['do_cosinedistance']):
+        net.layer[0].do_cosinedistance = True
+    net.layer[0].centroids = centroids
+    net.layer[0].centroids = np.append(net.layer[0].centroids,np.ones((1,net.layer[0].centroids.shape[1]),dtype=net.layer[0].centroids.dtype),axis=0)
+    net.layer[0].centroids = np.append(net.layer[0].centroids,np.ones((net.layer[0].centroids.shape[0],1),dtype=net.layer[0].centroids.dtype),axis=1)
+    net.layer[0].select_func = csf.select_names[p['cluster_func']]
+    net.layer[0].centroid_speed = p['cluster_speed']
+    net.layer[0].num_selected = p['clusters_selected']
 
 training_epochs = p['training_epochs']
 
 mse_list = []
+
+#these are the variables to save
+train_mse_list = [];
+train_missed_list = [];
+train_missed_percent_list = [];
+
+test_mse_list = [];
+test_missed_list = [];
+test_missed_percent_list = [];
 
 minibatch_size = p['minibatch_size']
 save_interval = p['save_interval']
@@ -177,7 +188,8 @@ for i in range(training_epochs):
         net.back_propagate()
         net.update_weights()
         #update cluster centroids
-        csf.update_names[p['cluster_func']](net.layer[0])
+        if(p['clusters_selected'] != p['num_centroids']):
+            csf.update_names[p['cluster_func']](net.layer[0])
     train_missed_percent = float(train_missed)/float(train_size)
 
     net.train = False
@@ -194,6 +206,14 @@ for i in range(training_epochs):
     test_missed_percent = float(test_missed)/float(test_size)
     net.train = True
 
+    #log everything for saving
+    train_mse_list.append(train_mse)
+    train_missed_list.append(train_missed)
+    train_missed_percent_list.append(train_missed_percent)
+    test_mse_list.append(test_mse)
+    test_missed_list.append(test_missed)
+    test_missed_percent_list.append(test_missed_percent)
+
     train_mse = float(train_mse)/float(train_size)
     time_elapsed = time.time() - t
     t = time.time()
@@ -201,7 +221,7 @@ for i in range(training_epochs):
     print("epoch " + str(i) + " mse " + str(train_mse));
     print('Train :               epoch ' + "{0: 4d}".format(i) +
     " mse: " + "{0:<8.4f}".format(train_mse) + " percent missed: " + "{0:<8.4f}".format(train_missed_percent) + str(time_elapsed))
-    print('Test : (P1 Weights): epoch ' + "{0: 4d}".format(i) +
+    print('Test  : (P1 Weights): epoch ' + "{0: 4d}".format(i) +
     " mse: " + "{0:<8.4f}".format(test_mse) + " missed: " + "{0: 5d}".format(test_missed) +
     " percent missed: " + "{0:<8.4f}".format(test_missed_percent));
 
@@ -209,11 +229,19 @@ for i in range(training_epochs):
     if(time.time() - save_time > save_interval or i == training_epochs-1 or save_and_exit==True):
         print('saving results...');
         f = h5.File(str(p['results_dir']) + str(p['simname']) + '_' + str(p['version']) + '.h5py','w')
-        f['centroids'] = net.layer[0].centroids
+        if(hasattr(net.layer[0],'centroids')):
+            f['centroids'] = net.layer[0].centroids
         f['weights_0'] = net.layer[0].weights
         f['weights_1'] = net.layer[1].weights
         f['epoch'] = i
         f['mse_list'] = np.array(mse_list)
+        f['train_mse_list'] = np.array(train_mse_list)
+        f['train_missed_list'] = np.array(train_missed_list)
+        f['train_missed_percent_list'] = np.array(train_missed_percent_list)
+        f['test_mse_list'] = np.array(test_mse_list)
+        f['test_missed_list'] = np.array(test_missed_list)
+        f['test_missed_percent_list'] = np.array(test_missed_percent_list)
+
         #iterate through all parameters and save them in the parameters group
         p_group = f.create_group('parameters');
         for param in p.iteritems():
