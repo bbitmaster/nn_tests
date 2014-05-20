@@ -55,6 +55,8 @@ def load_data(digits,dataset,p):
 (sample_data,class_data) = load_data(range(10),"training",p)
 train_size = sample_data.shape[0]
 
+(test_data,test_class) = load_data(range(10),"testing",p)
+
 #cluster using k-means
 num_centroids = p['num_centroids']
 
@@ -180,6 +182,17 @@ for i in range(training_epochs):
         f['weights_1'] = net.layer[1].weights
         f['epoch'] = i
         f['mse_list'] = np.array(mse_list)
+        if(p.has_key('save_hidden') and p['save_hidden'] == True):
+            print('saving hidden layer')
+            net.input = np.transpose(sample_data)
+            net.feed_forward()
+            f['sample_data'] = np.array(net.layer[0].output)
+            f['class_data'] = np.array(class_data)
+            net.input = np.transpose(test_data)
+            net.feed_forward()
+            f['test_data'] = np.array(net.layer[0].output)
+            f['test_class'] = np.array(test_class)
+
         #iterate through all parameters and save them in the parameters group
         p_group = f.create_group('parameters');
         for param in p.iteritems():

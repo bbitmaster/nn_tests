@@ -53,11 +53,34 @@ def load_data(digits,dataset,p):
         
     return (sample_data,class_data)
 
-(sample_data,class_data) = load_data(range(10),"training",p)
-(test_data,test_class) = load_data(range(10),"testing",p)
+if(p.has_key('data_fname') and p['data_fname'] is not None):
+    print('Loading training data from:\n' + str(p['data_fname']))
+    f = h5.File(p['data_fname'])
+    print('data was at epoch: ' + str(f['epoch'].value))
+    sample_data = np.array(f['sample_data']).transpose()
+    print('sample_data_max:(before normalization) ' + str(np.max(np.abs(sample_data))))
+    #sample_data_mean = np.mean(sample_data,axis=0)
+    #sample_data_std = np.max(np.abs(sample_data),axis=0)
+    #sample_data = sample_data/sample_data_std
+    #print('sample_data_max: ' + str(np.max(np.abs(sample_data))))
+    class_data = np.array(f['class_data'])
+    test_data = np.array(f['test_data']).transpose()
+    #test_data = test_data/sample_data_std
+    #print('test_data_max: ' + str(np.max(np.abs(test_data))))
+    test_class = np.array(f['test_class'])
+    class_data[class_data > .01] = p['correct_target']
+    class_data[class_data < -.01] = p['incorrect_target']
+    test_class[test_class > .01] = p['correct_target']
+    test_class[test_class < -.01] = p['incorrect_target']
+    print('data successfully loaded...')
+else:
+    (sample_data,class_data) = load_data(range(10),"training",p)
+    (test_data,test_class) = load_data(range(10),"testing",p)
 test_class = test_class.transpose()
 train_size = sample_data.shape[0]
 test_size  = test_data.shape[0]
+
+input_size = sample_data.shape[1]
 
 #cluster using k-means
 num_centroids = p['num_centroids']
@@ -103,7 +126,8 @@ if(p['load_centroids'] and os.path.exists(p['data_dir'] + 'mnist_initial_centroi
     centroids = np.array(f['centroids'])
     print('centroid data loaded. Shape: ' + str(centroids.shape))
     f.close()
-else:
+#if clusters selected is the same as the number of neurons then we can skip this step (since everything will always be selected)
+elif(p['clusters_selected'] != p['num_centroids']):
     centroids = do_kmeans(sample_data);
     f = h5.File(p['data_dir'] + 'mnist_initial_centroids_' + str(num_centroids) + '.h5py','w')
     f['centroids'] = centroids
@@ -111,17 +135,20 @@ else:
 
 #now we have a k-means clustered set of centroids.
 
-#create an autoencoder network
+#create a classifier network
 
 layers = [];
-layers.append(nnet.layer(28*28))
-layers.append(nnet.layer(num_centroids,p['activation_function'],
-                         initialization_scheme=p['initialization_scheme'],
-                         initialization_constant=p['initialization_constant'],
-                         dropout=p['dropout'],sparse_penalty=p['sparse_penalty'],
-                         sparse_target=p['sparse_target'],use_float32=p['use_float32'],
-                         momentum=p['momentum'],maxnorm=p['maxnorm'],step_size=p['learning_rate']))
-layers.append(nnet.layer(10,
+layers.append(nnet.layer(input_size))
+
+if(not p.has_key('do_logistic') or p['do_logistic'] == False):
+    layers.append(nnet.layer(num_centroids,p['activation_function'],
+                             initialization_scheme=p['initialization_scheme'],
+                             initialization_constant=p['initialization_constant'],
+                             dropout=p['dropout'],sparse_penalty=p['sparse_penalty'],
+                             sparse_target=p['sparse_target'],use_float32=p['use_float32'],
+                             momentum=p['momentum'],maxnorm=p['maxnorm'],step_size=p['learning_rate']))
+
+layers.append(nnet.layer(10,p['activation_function_final'],
                          initialization_scheme=p['initialization_scheme_final'],
                          initialization_constant=p['initialization_constant_final'],
                          use_float32=p['use_float32'],
@@ -232,7 +259,8 @@ for i in range(training_epochs):
         if(hasattr(net.layer[0],'centroids')):
             f['centroids'] = net.layer[0].centroids
         f['weights_0'] = net.layer[0].weights
-        f['weights_1'] = net.layer[1].weights
+        if(not p.has_key('do_logistic') or p['do_logistic'] == False):
+            f['weights_1'] = net.layer[1].weights
         f['epoch'] = i
         f['mse_list'] = np.array(mse_list)
         f['train_mse_list'] = np.array(train_mse_list)
