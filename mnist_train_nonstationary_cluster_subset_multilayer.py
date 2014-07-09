@@ -35,36 +35,13 @@ def replace_centroids(net_layer,mask):
     number_to_replace = p['number_to_replace']
     neuron_used_indices = net_layer.eligibility_count.argsort()
     replace_indices = neuron_used_indices[0:number_to_replace]
-    samples = net_layer.input[:,0:number_to_replace]
+    samples_tmp = net_layer.input[:,mask]
+    samples = samples_tmp[:,0:number_to_replace]
     net_layer.centroids[replace_indices,:] = samples.transpose()
     #TODO: weighted euclidean stuff here
 
     #set the neurons we replaced to most used
     net_layer.eligibility_count[replace_indices] += 1.0 #np.max(net_layer.eligibility_count)
-
-    """
-                    #get the 8 least selected neurons
-                    replace_indices = neuron_used_indices[0:number_to_replace]
-                    #print("replace indices: " + str(replace_indices))
-                    neuron_used_indices = neuron_used_indices[number_to_replace:]
-                    #need some sample data points -- could use k-means -- for now sample randomly
-                    #samples is S x N where S is number of samples, and N is input size
-                    mask = np.equal(l,np.argmax(classification,0))
-                    sample_data_tmp = train_sample_data[:,mask]
-                    samples = sample_data_tmp[:,0:number_to_replace]
-
-                    #need to tack on the bias
-                    samples = np.append(samples,np.ones((1,samples.shape[1]),dtype=samples.dtype),axis=0)
-            
-                    #replace centroids with new ones drawn from samples
-                    net.layer[0].centroids[replace_indices,:] = samples.transpose()
-                    if(p.has_key('do_weighted_euclidean') and p['do_weighted_euclidean']):
-                        net.layer[0].centroids[replace_indices,:] = net.layer[0].centroids[replace_indices,:]*net.layer[0].weights[replace_indices,:]
-
-                    #reset error mean
-                    #add a bit of a bias, to ensure it doesn't exceed the threshold immediately again
-                    error_mean_avg[l] = error_mean[l] + 1.0
-                    """
 
 def load_data(digits,dataset,p):
     images, labels = read_mnist(digits,dataset,path=p['data_dir']);
@@ -310,7 +287,26 @@ test_missed_percent2_list = [];
 
 training_mode_list = [];
 
-shuffle_rate = p['shuffle_rate'];
+test_missed_percent1 = 1.0
+test_missed_percent2 = 1.0
+ 
+best_percent_missed1 = 1.0
+best_percent_missed2 = 1.0
+best_percent_missed1_epoch = 0
+best_percent_missed2_epoch = 0
+ 
+if(p.has_key('shuffle_rate')):
+    shuffle_rate = p['shuffle_rate']
+if(p.has_key('shuffle_type')):
+    shuffle_type = p['shuffle_type']
+if(p.has_key('shuffle_missed_percent')):
+    shuffle_missed_percent = p['shuffle_missed_percent']
+if(p.has_key('shuffle_max_epochs')):
+    shuffle_max_epochs = p['shuffle_max_epochs']
+
+shuffle_epoch = -1
+quit_epoch = training_epochs
+p2_training_epochs = 300
 
 training_mode = MODE_P1
 (sample_data,class_data) = (sample_data1,class_data1)
@@ -342,8 +338,25 @@ print("Begin Training...")
 for i in range(training_epochs):
 
     do_shuffle = False
-    if(i > 0 and (not (i%shuffle_rate))):
-        do_shuffle = True
+    if(shuffle_type == 'shuffle_rate'):
+         if(i > 0 and (not (i%shuffle_rate))):
+             do_shuffle = True
+    elif(shuffle_type == 'missed_percent'):
+         if(test_missed_percent1 < shuffle_missed_percent):
+             shuffle_epoch = i
+             do_shuffle = True
+             shuffle_type = '' #don't shuffle again
+    elif(shuffle_type == 'no_improvement'):
+         if(training_mode == MODE_P1 and (i > best_percent_missed1_epoch + shuffle_max_epochs)):
+             print('It has been '+str(shuffle_max_epochs)+' epochs since last improvement...')
+             best_percent_missed2 = i #make sure to reset the counter
+             shuffle_epoch = i
+             do_shuffle = True
+             quit_epoch = i + p2_training_epochs
+         if(training_mode == MODE_P2 and (i > quit_epoch)):
+             print('we have trained on P2 for '+str(p2_training_epochs)+' epochs... quitting')
+             save_and_exit=True
+
 
     if(do_shuffle):
         #if we're in mode P2, then we need to switch to mode P1
@@ -398,7 +411,7 @@ for i in range(training_epochs):
 
                 if(p.has_key('threshold_cheat') and p['threshold_cheat'] is not None):
                     #on very first minibatch of new epoch, do switch
-                    if((not (i%shuffle_rate)) and j == 0):
+                    if((i == 0 or do_shuffle) and j == 0):
                         exceeded = True
                 elif(error_mean_difference[l] > error_difference_threshold):
                     exceeded = True
@@ -413,6 +426,7 @@ for i in range(training_epochs):
                             net.feed_forward()
                             net.error = net.output - classification
                             replace_centroids(net.layer[layer_num],mask)
+                            net.feed_forward()
                     #ensure error does not jump up again immediately
                     error_mean_avg[l] = error_mean[l] + 1.0
 
@@ -488,12 +502,23 @@ for i in range(training_epochs):
 #    + " mse_new: " + "{:8.4f}".format(test_mse_new) + " acc_new: " + "{:.4f}".format(test_accuracy_new))
     time_elapsed = time.time() - t
     t = time.time()
+    if(best_percent_missed1 > test_missed_percent1):
+        best_percent_missed1 = test_missed_percent1
+        best_percent_missed1_epoch = i
+
+    if(best_percent_missed2 > test_missed_percent2):
+        best_percent_missed2 = test_missed_percent2
+        best_percent_missed2_epoch = i
+
+
+
     print('Train :               epoch ' + "{0: 4d}".format(i) +
     " mse: " + "{0:<8.4f}".format(train_mse) + " percent missed: " + "{0:<8.4f}".format(train_missed_percent) + str(time_elapsed))
     print('Test 1: (P1 Weights): epoch ' + "{0: 4d}".format(i) + 
-    " mse: " + "{0:<8.4f}".format(test_mse1) + " missed: " + "{0: 5d}".format(test_missed1) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent1));
+     " mse: " + "{0:<8.4f}".format(test_mse1) + " missed: " + "{0: 5d}".format(test_missed1) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent1) + " * {0:<8.4f}".format(best_percent_missed1));
     print('Test 2: (P2 weights): epoch ' + "{0: 4d}".format(i) +
-    " mse: " + "{0:<8.4f}".format(test_mse2) + " missed: " + "{0: 5d}".format(test_missed2) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent2));
+    " mse: " + "{0:<8.4f}".format(test_mse2) + " missed: " + "{0: 5d}".format(test_missed2) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent2) + " * {0:<8.4f}".format(best_percent_missed2));
+
 
     #f_out.write(str(train_mse) + "," + str(train_missed_percent) + "," + str(test_missed_percent) + "\n")
     if(time.time() - save_time > save_interval or i == training_epochs-1 or save_and_exit==True):
@@ -517,6 +542,8 @@ for i in range(training_epochs):
         f_handle['error_thresh_list'] = np.array(error_thresh_list)
         f_handle['error_mean_difference_log'] = np.array(error_mean_difference_log)
         f_handle['minibatch_count'] = minibatch_count
+        f_handle['shuffle_epoch'] = int(shuffle_epoch)
+
    
         #iterate through all parameters and save them in the parameters group
         p_group = f_handle.create_group('parameters');
