@@ -232,6 +232,17 @@ layers.append(nnet.layer(num_labels,p['activation_function_final'],use_float32=p
 
 np.random.seed(p['random_seed']);
 
+if(p.has_key('random_variance')):
+    sample_data1 = sample_data1 + np.random.normal(0,float(p['random_variance']),sample_data1.shape)
+    sample_data2 = sample_data2 + np.random.normal(0,float(p['random_variance']),sample_data2.shape)
+    sample_data1 = np.asarray(sample_data1,np.float32)
+    sample_data2 = np.asarray(sample_data2,np.float32)
+    sample_data1[sample_data1 > 1.5] = 1.5
+    sample_data1[sample_data1 < -1.5] = -1.5
+    sample_data2[sample_data2 > 1.5] = 1.5
+    sample_data2[sample_data2 < -1.5] = -1.5
+    print('random_variance... ' + str(float(p['random_variance'])) + ' ' + str(np.max(np.abs(sample_data1))) + ' ' + str(np.max(np.abs(sample_data2))))
+
 #init net
 net = nnet.net(layers)
 

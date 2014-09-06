@@ -69,6 +69,28 @@ def load_data(digits,dataset,p):
 
     return (sample_data,class_data)
 
+def load_newsgroup_data(indices_to_load,dataset,p,max_features):
+    f_handle = h5py.File('/home/bgoodric/research/python/nn_experiments/data/dataset_20newsgroups_'+str(max_features)+'.h5py','r')
+    if(dataset == 'training'):
+        sample_data  = f_handle['train_data']
+        labels= f_handle['train_class']
+    if(dataset == 'testing'):
+        sample_data  = f_handle['test_data']
+        labels = f_handle['test_class']
+    
+    class_count = max(labels) + 1
+    #build classification data in the form of neuron outputs
+    class_data = np.ones((labels.shape[0],class_count))*p['incorrect_target']
+    for i in range(labels.shape[0]):
+        class_data[i,labels[i]] = 1.0;
+
+    if(p['use_float32']):
+        sample_data = np.asarray(sample_data,np.float32)
+        class_data = np.asarray(class_data,np.float32)
+
+    return (sample_data,class_data)
+
+
 def pca_reduce(data):
     data_means = np.mean(data,axis=0)
     data = np.copy(data - data_means)
@@ -89,16 +111,24 @@ def normalize_data(data,means,stds):
     data_reduced[data_reduced < -1.5] = -1.5
     return data_reduced
 
-P1_list = list(p['P1_list'][1:])
-P1_list = [int(x) for x in P1_list]
-P2_list = list(p['P2_list'][1:])
-P2_list = [int(x) for x in P2_list]
+P1_list = p['P1_list'][1:]
+P1_list = [int(x) for x in P1_list.split('L')]
+P2_list = p['P2_list'][1:]
+P2_list = [int(x) for x in P2_list.split('L')]
+#P1_list = [int(x) for x in P1_list]
+#P2_list = [int(x) for x in P2_list]
+print('P1_list: ' + str(P1_list))
+print('P2_list: ' + str(P2_list))
+
 total_list = P1_list + P2_list
 
 print("Loading Data...")
-#get only first 4 digits
-(data_full,class_data) = load_data(tuple(total_list),"training",p)
-(test_data_full,test_class_data) = load_data(tuple(total_list),"testing",p)
+if(p['dataset'] == "MNIST"):
+    (data_full,class_data) = load_data(tuple(total_list),"training",p)
+    (test_data_full,test_class_data) = load_data(tuple(total_list),"testing",p)
+else:
+    (data_full,class_data) = load_newsgroup_data(tuple(total_list),"training",p,2000)
+    (test_data_full,test_class_data) = load_newsgroup_data(tuple(total_list),"testing",p,2000)
 train_size = data_full.shape[0]
 
 print("Splitting classes")
@@ -129,22 +159,21 @@ num_labels = len(P1_list)
 print("P1 Samples: " + str(np.sum(P1_mask)) + " P2 Samples: " + str(np.sum(P2_mask)))
 print("P2 Test Samples: " + str(np.sum(P1_test_mask)) + " P2 Test Samples: " + str(np.sum(P2_test_mask)))
 
-print("Doing PCA Reduction...")
-reduce_to = p['reduce_to']
-
-#pca reduce
-(pca_transform,data_means) = pca_reduce(data_full)
-data_reduced = np.dot(data_full,pca_transform[:,0:reduce_to])
-test_data_reduced = np.dot(test_data_full,pca_transform[:,0:reduce_to])
-
 print("Normalizing...")
 #we should normalize the pca reduced data
 if(p.has_key('skip_pca') and p['skip_pca'] == True):
     print("Skipping PCA Reduction...")
     data_reduced = data_full
     test_data_reduced = test_data_full
-    reduce_to = 28*28;
+    reduce_to = data_full.shape[1];
 else:
+    print("Doing PCA Reduction...")
+    reduce_to = p['reduce_to']
+
+    #pca reduce
+    (pca_transform,data_means) = pca_reduce(data_full)
+    data_reduced = np.dot(data_full,pca_transform[:,0:reduce_to])
+    test_data_reduced = np.dot(test_data_full,pca_transform[:,0:reduce_to])
     pca_data_means = np.mean(data_reduced,axis=0)
     pca_data_std = np.std(data_reduced,axis=0)
     data_reduced = normalize_data(data_reduced,pca_data_means,pca_data_std)
@@ -184,11 +213,22 @@ print("Network Initialization...")
 
 np.random.seed(p['random_seed']);
 
+if(p.has_key('random_variance')):
+    sample_data1 = sample_data1 + np.random.normal(0,float(p['random_variance']),sample_data1.shape)
+    sample_data2 = sample_data2 + np.random.normal(0,float(p['random_variance']),sample_data2.shape)
+    sample_data1 = np.asarray(sample_data1,np.float32)
+    sample_data2 = np.asarray(sample_data2,np.float32)
+    sample_data1[sample_data1 > 1.5] = 1.5
+    sample_data1[sample_data1 < -1.5] = -1.5
+    sample_data2[sample_data2 > 1.5] = 1.5
+    sample_data2[sample_data2 < -1.5] = -1.5
+
+    print('random_variance... ' + str(float(p['random_variance'])) + ' ' + str(np.max(np.abs(sample_data1))) + ' ' + str(np.max(np.abs(sample_data2))))
+
 training_epochs = p['training_epochs']
 
 minibatch_size = p['minibatch_size']
 
-# ---- PUT THIS IN A FUNCTION ----
 def init_network(pnet,input_size):
     num_hidden = pnet['num_hidden']
 
@@ -336,6 +376,8 @@ for e in range(num_ensembles):
     pnet['do_cosinedistance']             = p['do_cosinedistance'][e]
     pnet['use_float32'] = p['use_float32']
     pnet['reduce_to'] = p['reduce_to']
+
+
     nnetwork = init_network(pnet,reduce_to)
     nnetwork.ens_count = e
     net_list.append((nnetwork))
@@ -348,14 +390,20 @@ save_time = time.time()
 train_mse_list = [];
 train_missed_list = [];
 train_missed_percent_list = [];
+train_missed_majorityvote_list = [];
+train_missed_percent_majorityvote_list = [];
 
 test_mse1_list = [];
 test_missed1_list = [];
 test_missed_percent1_list = [];
+test_missed1_majorityvote_list = [];
+test_missed_percent1_majorityvote_list = [];
 
 test_mse2_list = [];
 test_missed2_list = [];
 test_missed_percent2_list = [];
+test_missed2_majorityvote_list = [];
+test_missed_percent2_majorityvote_list = [];
 
 training_mode_list = [];
 
@@ -418,7 +466,7 @@ def do_train_iteration(net,train_sample_data,classification,epoch_count,minibatc
             if(exceeded):
                 net.error_thresh_list.append((i,l))
                 mask = np.equal(l,np.argmax(classification,0))
-                print("NETWORK "+str(net.ens_count)+" ERROR EXCEEDED TRESHOLD FOR LABEL " + str(l))
+                print("NETWORK "+str(net.ens_count)+": ERROR EXCEEDED TRESHOLD FOR LABEL " + str(l))
                 for layer_num in range(len(net.layer)):
                     str_list = ("","2","3","final")
                     str_to_append = str_list[layer_num]
@@ -429,6 +477,17 @@ def do_train_iteration(net,train_sample_data,classification,epoch_count,minibatc
                         net.feed_forward()
                 #ensure error does not jump up again immediately
                 net.error_mean_avg[l] = net.error_mean[l] + 1.0
+
+                #only lower learning rate on first label (not on all of them)
+                if(l == 0):
+                    if(p.has_key('lowerlearningrate') and p['lowerlearningrate'] == True):
+                        random_select = np.random.random()
+                        if(random_select < p['lowerlearningrate_probability']):
+                            print("NETWORK " + str(net.ens_count) + ": lowering learning rate" )
+                            for layer in net.layer:
+                                layer.step_size = layer.step_size*p['lowerlearningrate_factor']
+                    for layer_index,layer in enumerate(net.layer):
+                        print("NETWORK " + str(net.ens_count) + ": Layer " + str(layer_index) + ": learning rate: " + str(layer.step_size))
 
 print("init centroid detection stuff")
 for e in range(int(len(p['num_hidden']))):
@@ -487,8 +546,9 @@ for i in range(training_epochs):
     np.random.shuffle(class_data.transpose())
     
     #count number of correct
-    train_missed = 0.0;
-    train_mse = 0.0;
+    train_missed = 0.0
+    train_mse = 0.0
+    train_missed_majorityvote = 0.0
     for j in range(minibatch_count):
         #grab a minibatch
         train_sample_data = np.transpose(sample_data[j*minibatch_size:(j+1)*minibatch_size])
@@ -501,6 +561,7 @@ for i in range(training_epochs):
 
         ens_error = np.zeros(classification.shape)
         ens_output = np.zeros(classification.shape)
+        ens_output_majorityvote = np.zeros(classification.shape)
         for e in range(num_ensembles):
             nnetwork = net_list[e]
             do_train_iteration(nnetwork,train_sample_data,classification,i,j,do_shuffle)
@@ -518,6 +579,10 @@ for i in range(training_epochs):
                     csf.update_names[p['cluster_func' + str_to_append][e]](nnetwork.layer[k])
             ens_output = ens_output + nnetwork.output
             ens_error = ens_error + (nnetwork.error**2)
+            #get a one hot encoded vote of the output (for majority calculation)
+            vote = (nnetwork.output == np.max(nnetwork.output,axis=0))
+            #add this vote to the majority vote
+            ens_output_majorityvote = ens_output_majorityvote + vote.astype(int)
 
         ens_output /= num_ensembles
         ens_error /= num_ensembles
@@ -527,16 +592,22 @@ for i in range(training_epochs):
         guess = np.argmax(ens_output,0)
         train_missed = train_missed + np.sum(c != guess)
 
+        guess_majorityvote = np.argmax(ens_output_majorityvote,0)
+        train_missed_majorityvote = train_missed_majorityvote + np.sum(c != guess_majorityvote)
+
 
     train_mse = float(train_mse)/float(train_size)
     train_missed_percent = float(train_missed)/float(train_size)
+    train_missed_percent_majorityvote = float(train_missed_majorityvote)/float(train_size)
     for e in range(num_ensembles):
         net_list[e].train = False
 
     #feed test set through to get test 1 rates
     ens_output = np.zeros(test_class1.shape)
     ens_error = np.zeros(test_class1.shape)
+    ens_output_majorityvote = np.zeros(test_class1.shape)
 
+    sys.stdout.write("ensemble 1 miss rate: ")
     for e in range(num_ensembles):
         nnetwork = net_list[e]
         nnetwork.input = np.transpose(test_data1)
@@ -544,12 +615,15 @@ for i in range(training_epochs):
         nnetwork.error = nnetwork.output - test_class1
         ens_error = ens_error + nnetwork.error**2
         ens_output = ens_output + nnetwork.output
-        #c = np.argmax(test_class1,0)
-        #test_guess1 = np.argmax(nnetwork.output,0)
-        #test_missed1 = np.sum(c != test_guess1)
-        #test_size1 = test_data1.shape[0]
-        #sys.stdout.write(str(float(test_missed1)/float(test_size1)) + ' ')
-    #sys.stdout.write('\n')
+        c = np.argmax(test_class1,0)
+        test_guess1 = np.argmax(nnetwork.output,0)
+        test_missed1 = np.sum(c != test_guess1)
+        test_size1 = test_data1.shape[0]
+        sys.stdout.write(str(float(test_missed1)/float(test_size1)) + ' ')
+        #majority vote
+        vote = (nnetwork.output == np.max(nnetwork.output,axis=0))
+        ens_output_majorityvote = ens_output_majorityvote + vote.astype(int)
+    sys.stdout.write('\n')
     ens_output /= num_ensembles
     ens_error /= num_ensembles
     test_guess1 = np.argmax(ens_output,0)
@@ -559,9 +633,15 @@ for i in range(training_epochs):
     test_mse1 = np.sum(ens_error)
     test_mse1 = float(test_mse1)/float(test_size1)
     test_missed_percent1 = float(test_missed1)/float(test_size1)
+    #majority vote
+    test_guess1_majorityvote = np.argmax(ens_output_majorityvote,0)
+    test_missed1_majorityvote = np.sum(c != test_guess1_majorityvote)
+    test_missed_percent1_majorityvote = float(test_missed1_majorityvote)/float(test_size1)
 
     ens_output = np.zeros(test_class2.shape)
     ens_error = np.zeros(test_class2.shape)
+    ens_output_majorityvote = np.zeros(test_class2.shape)
+    sys.stdout.write("ensemble 2 miss rate: ")
     for e in range(num_ensembles):
         nnetwork = net_list[e]
         nnetwork.input = np.transpose(test_data2)
@@ -569,6 +649,15 @@ for i in range(training_epochs):
         nnetwork.error = nnetwork.output - test_class2
         ens_error = ens_error + nnetwork.error**2
         ens_output = ens_output + nnetwork.output
+        c = np.argmax(test_class2,0)
+        test_guess2 = np.argmax(nnetwork.output,0)
+        test_missed2 = np.sum(c != test_guess2)
+        test_size2 = test_data2.shape[0]
+        sys.stdout.write(str(float(test_missed2)/float(test_size2)) + ' ')
+        #majority vote
+        vote = (nnetwork.output == np.max(nnetwork.output,axis=0))
+        ens_output_majorityvote = ens_output_majorityvote + vote.astype(int)
+    sys.stdout.write('\n')
     ens_output /= num_ensembles
     ens_error /= num_ensembles
     #get test 2 rates
@@ -579,6 +668,10 @@ for i in range(training_epochs):
     test_mse2 = np.sum(ens_error)
     test_mse2 = float(test_mse2)/float(test_size2)
     test_missed_percent2 = float(test_missed2)/float(test_size2)
+    #majority vote
+    test_guess2_majorityvote = np.argmax(ens_output_majorityvote,0)
+    test_missed2_majorityvote = np.sum(c != test_guess2_majorityvote)
+    test_missed_percent2_majorityvote = float(test_missed2_majorityvote)/float(test_size2)
 
     for e in range(num_ensembles):
         net_list[e].train = True
@@ -587,16 +680,21 @@ for i in range(training_epochs):
     train_mse_list.append(train_mse)
     train_missed_list.append(train_missed)
     train_missed_percent_list.append(train_missed_percent)
+    train_missed_majorityvote_list.append(train_missed_majorityvote)
+    train_missed_percent_majorityvote_list.append(train_missed_percent_majorityvote)
     
     #test rate 1 and 2
     test_mse1_list.append(test_mse1)
     test_missed1_list.append(test_missed1)
     test_missed_percent1_list.append(test_missed_percent1)
+    test_missed1_majorityvote_list.append(test_missed1_majorityvote)
+    test_missed_percent1_majorityvote_list.append(test_missed_percent1_majorityvote)
     
     test_mse2_list.append(test_mse2)
     test_missed2_list.append(test_missed2)
     test_missed_percent2_list.append(test_missed_percent2)
-
+    test_missed2_majorityvote_list.append(test_missed2_majorityvote)
+    test_missed_percent2_majorityvote_list.append(test_missed_percent2_majorityvote)
 
     training_mode_list.append(training_mode)
 #    print('epoch ' + "{: 4d}".format(i) + ": " + " mse_old: " + "{:<8.4f}".format(test_mse_old) + " acc_old: " + "{:.4f}".format(test_accuracy_old)
@@ -614,11 +712,13 @@ for i in range(training_epochs):
 
 
     print('Train :               epoch ' + "{0: 4d}".format(i) +
-    " mse: " + "{0:<8.4f}".format(train_mse) + " percent missed: " + "{0:<8.4f}".format(train_missed_percent) + str(time_elapsed))
+    " mse: " + "{0:<8.4f}".format(train_mse) + " percent missed: " + "{0:<8.4f}".format(train_missed_percent) + " majority: " + "{0:<8.4f}".format(train_missed_percent_majorityvote) + str(time_elapsed))
     print('Test 1: (P1 Weights): epoch ' + "{0: 4d}".format(i) + 
-     " mse: " + "{0:<8.4f}".format(test_mse1) + " missed: " + "{0: 5d}".format(test_missed1) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent1) + " * {0:<8.4f}".format(best_percent_missed1));
+    " mse: " + "{0:<8.4f}".format(test_mse1) + " missed: " + "{0: 5d}".format(test_missed1) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent1) 
+    + " majority: " + "({0:<8.4f})".format(test_missed_percent1_majorityvote) + " * {0:<8.4f}".format(best_percent_missed1));
     print('Test 2: (P2 weights): epoch ' + "{0: 4d}".format(i) +
-    " mse: " + "{0:<8.4f}".format(test_mse2) + " missed: " + "{0: 5d}".format(test_missed2) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent2) + " * {0:<8.4f}".format(best_percent_missed2));
+    " mse: " + "{0:<8.4f}".format(test_mse2) + " missed: " + "{0: 5d}".format(test_missed2) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent2) 
+    + " majority: " + "({0:<8.4f})".format(test_missed_percent2_majorityvote) + " * {0:<8.4f}".format(best_percent_missed2));
 
 
     #f_out.write(str(train_mse) + "," + str(train_missed_percent) + "," + str(test_missed_percent) + "\n")
@@ -628,14 +728,20 @@ for i in range(training_epochs):
         f_handle['train_mse_list'] = np.array(train_mse_list);
         f_handle['train_missed_list'] = np.array(train_missed_list);
         f_handle['train_missed_percent_list'] = np.array(train_missed_percent_list);
+        f_handle['train_missed_majorityvote_list'] = np.array(train_missed_majorityvote_list);
+        f_handle['train_missed_percent_majorityvote_list'] = np.array(train_missed_percent_majorityvote_list);
         
         f_handle['test_mse1_list'] = np.array(test_mse1_list);
         f_handle['test_missed1_list'] = np.array(test_missed1_list);
         f_handle['test_missed_percent1_list'] = np.array(test_missed_percent1_list);
+        f_handle['test_missed1_majorityvote_list'] = np.array(test_missed1_majorityvote_list);
+        f_handle['test_missed_percent1_majorityvote_list'] = np.array(test_missed_percent1_majorityvote_list);
         
         f_handle['test_mse2_list'] = np.array(test_mse2_list);
         f_handle['test_missed2_list'] = np.array(test_missed2_list);
         f_handle['test_missed_percent2_list'] = np.array(test_missed_percent2_list);
+        f_handle['test_missed2_majorityvote_list'] = np.array(test_missed2_majorityvote_list);
+        f_handle['test_missed_percent2_majorityvote_list'] = np.array(test_missed_percent2_majorityvote_list);
 
         f_handle['training_mode_list'] = np.array(training_mode_list)
 

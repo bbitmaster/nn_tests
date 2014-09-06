@@ -3,11 +3,13 @@ from nnet_toolkit import select_funcs as sf;
 
 #A handy name for this run. The data file will be given this name as
 #<resultsdir><simname><version>.h5py
-simname = 'mnist_train_nonstationary_cluster_subseti_multilayer_ensemble'
+simname = 'mnist_train_nonstationary_cluster_subseti_multilayer_ensemble_test'
 version = '1.1'
 results_dir = '../results/'
 
 data_dir = '../data/'
+
+dataset="MNIST"
 
 use_float32=True
 
@@ -17,8 +19,8 @@ correct_target = 1.0
 skip_pca = True
 threshold_cheat = True
 
-P1_list='L12349'
-P2_list='L56780'
+P1_list='L1L2L3L4L9'
+P2_list='L5L6L7L8L0'
 
 num_hidden = [128,128,128,128,128]
 num_hidden2 = [64,64,64,64,64]
