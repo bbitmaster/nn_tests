@@ -9,6 +9,9 @@ results_dir = '../results/'
 
 data_dir = '../data/'
 
+correct_target=1.0
+incorrect_target=0.0
+
 load_centroids = False
 do_cosinedistance = True
 save_interval = 30*60

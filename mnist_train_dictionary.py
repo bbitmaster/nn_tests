@@ -8,6 +8,7 @@ import sys
 import time
 import os
 import h5py as h5
+from sklearn import linear_model
 
 #Get the parameters file from the command line
 #use mnist_train__forget_params.py by default (no argument given)
@@ -18,6 +19,10 @@ else:
     
 p = {}
 execfile(params_file,p)
+
+def apply_weight_decay(net,decay_constant):
+    for l in reversed(net.layer):
+        l.weights = l.weights*(1.0 - decay_constant)
 
 #grab extra parameters from command line
 for i in range(2,len(sys.argv)):
@@ -57,6 +62,9 @@ train_size = sample_data.shape[0]
 
 (test_data,test_class) = load_data(range(10),"testing",p)
 
+#init random number generator
+np.random.seed(p['random_seed']);
+
 #cluster using k-means
 num_centroids = p['num_centroids']
 
@@ -65,8 +73,10 @@ select_indices = np.random.randint(60000,size=num_centroids);
 def do_kmeans(sample_data):
     #init clusters
     centroids = sample_data[select_indices,:]
-
-    max_iters = 1000
+    if(p.has_key('max_iters')):
+        max_iters = p['max_iters']
+    else:
+        max_iters = 1000
     stop_flag = False
     num_iters = 0
     matching = 0
@@ -110,10 +120,15 @@ else:
 #now we have a k-means clustered set of centroids.
 
 #create an autoencoder network
+if(p.has_key('nodes_per_group')):
+    nodes_per_group=p['nodes_per_group']
+else:
+    nodes_per_group=p['num_hidden']
 
 layers = [];
 layers.append(nnet.layer(28*28))
 layers.append(nnet.layer(num_centroids,p['activation_function'],
+                         nodes_per_group=nodes_per_group,
                          initialization_scheme=p['initialization_scheme'],
                          initialization_constant=p['initialization_constant'],
                          dropout=p['dropout'],sparse_penalty=p['sparse_penalty'],
@@ -132,21 +147,28 @@ layers.append(nnet.layer(28*28,
 net = nnet.net(layers)
 if(p['do_cosinedistance']):
     net.layer[0].do_cosinedistance = True
-net.layer[0].centroids = centroids
-net.layer[0].centroids = np.append(net.layer[0].centroids,np.ones((1,net.layer[0].centroids.shape[1]),dtype=net.layer[0].centroids.dtype),axis=0)
-net.layer[0].centroids = np.append(net.layer[0].centroids,np.ones((net.layer[0].centroids.shape[0],1),dtype=net.layer[0].centroids.dtype),axis=1)
-net.layer[0].select_func = csf.select_names[p['cluster_func']]
-net.layer[0].centroid_speed = p['cluster_speed']
-net.layer[0].num_selected = p['clusters_selected']
+
+if(p['cluster_func'] is not None):
+    net.layer[0].centroids = centroids
+    net.layer[0].centroids = np.append(net.layer[0].centroids,np.ones((1,net.layer[0].centroids.shape[1]),dtype=net.layer[0].centroids.dtype),axis=0)
+    net.layer[0].centroids = np.append(net.layer[0].centroids,np.ones((net.layer[0].centroids.shape[0],1),dtype=net.layer[0].centroids.dtype),axis=1)
+    net.layer[0].select_func = csf.select_names[p['cluster_func']]
+    net.layer[0].centroid_speed = p['cluster_speed']
+    net.layer[0].num_selected = p['clusters_selected']
 
 training_epochs = p['training_epochs']
 
 mse_list = []
+if(p.has_key('l2_weight_decay_constant')):
+    l2_weight_decay_constant = p['l2_weight_decay_constant']
+else:
+    l2_weight_decay_constant = 0.0
 
 minibatch_size = p['minibatch_size']
 save_interval = p['save_interval']
 save_and_exit=False
 save_time = time.time()
+t = time.time()
 for i in range(training_epochs):
     train_size = sample_data.shape[0]
     minibatch_count = int(train_size/minibatch_size)
@@ -168,16 +190,50 @@ for i in range(training_epochs):
 
         net.back_propagate()
         net.update_weights()
+        apply_weight_decay(net,l2_weight_decay_constant)
+
         #update cluster centroids
-        csf.update_names[p['cluster_func']](net.layer[0])
+        if(p['cluster_func'] is not None):
+            csf.update_names[p['cluster_func']](net.layer[0])
 
     train_mse = float(train_mse)/float(train_size)
-    print("epoch " + str(i) + " mse " + str(train_mse));
+
+    time_elapsed = time.time() - t
+    t = time.time()
+    print("epoch " + str(i) + " mse " + str(train_mse) + " layer 0 weight norm: " + str(np.sum(net.layer[0].weights**2))+ " " + str(time_elapsed));
     mse_list.append(train_mse)
+
+    #compute logistic regression mse if we're done
+    if(i == training_epochs-1):
+        net.input = np.transpose(sample_data)
+        net.feed_forward()
+
+        class_data_index = np.argmax(class_data,axis=1)
+        test_class_index = np.argmax(test_class,axis=1)
+
+        #logistic_regression time
+        logreg = linear_model.LogisticRegression()
+
+        print("Doing Logistic Regression...")
+        logtime = time.time()
+        logreg.fit(net.layer[0].output.transpose(),class_data_index)
+        print("time taken: " + str(time.time() - logtime))
+        
+        print("Predicting")
+        net.input = np.transpose(test_data)
+        net.feed_forward()
+        test_class_prediction = logreg.predict(net.layer[0].output.transpose())
+
+        miss_class = test_class_prediction != test_class_index
+        miss_class_percentage = float(np.sum(miss_class))/float(miss_class.shape[0])
+
+        print("missclass percentage: " + str(miss_class_percentage))
+
     if(time.time() - save_time > save_interval or i == training_epochs-1 or save_and_exit==True):
         print('saving results...');
         f = h5.File(str(p['results_dir']) + str(p['simname']) + '_' + str(p['version']) + '.h5py','w')
-        f['centroids'] = net.layer[0].centroids
+        if(hasattr(net.layer[0],'centroids')):
+            f['centroids'] = net.layer[0].centroids
         f['weights_0'] = net.layer[0].weights
         f['weights_1'] = net.layer[1].weights
         f['epoch'] = i
@@ -192,7 +248,11 @@ for i in range(training_epochs):
             net.feed_forward()
             f['test_data'] = np.array(net.layer[0].output)
             f['test_class'] = np.array(test_class)
-
+        try:
+            f['miss_class_percentage'] = miss_class_percentage
+            f['miss_class'] = miss_class
+        except NameError:
+            pass
         #iterate through all parameters and save them in the parameters group
         p_group = f.create_group('parameters');
         for param in p.iteritems():
