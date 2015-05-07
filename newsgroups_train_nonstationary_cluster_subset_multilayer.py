@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+#copied from mnist_train_nonstationsry_cluster_subset_multilayer
+#adapted to work on 20 newsgroups dataset as saved by get_20newsgroups.py
+
 import numpy as np
 from mnist_numpy import read_mnist
 from nnet_toolkit import nnet
@@ -10,8 +13,6 @@ import time
 #h5py used for saving results to a file
 import h5py
 
-print(str(np.show_config()))
-
 #constants
 MODE_P1 = 0
 MODE_P2 = 1
@@ -21,7 +22,7 @@ MODE_P2 = 1
 if(len(sys.argv) > 1):
     params_file = sys.argv[1]
 else:
-    params_file = 'mnist_train_nonstationary_cluster_subset_params.py'
+    params_file = 'newsgroups_train_nonstationary_cluster_subset_multilayer_params.py'
     
 p = {}
 execfile(params_file,p)
@@ -33,21 +34,30 @@ for i in range(2,len(sys.argv)):
     p[k] = v
     print(str(k) + ":" + str(v))
     
-def load_data(digits,dataset,p):
-    images, labels = read_mnist(digits,dataset,path=p['data_dir']);
-    labels = labels.transpose()[0] #put labels in an array
-    images = np.float64(images)
-    #(normalize between 0-1)
-    images /= 255.0 
-    #normalize between -1 and 1 for hyperbolic tangent
-    images = images - 0.5;
-    images = images*2.0; 
-    
-    train_size = labels.shape[0]
-    sample_data = images.reshape(train_size,28*28)
+def replace_centroids(net_layer,mask):
+    number_to_replace = p['number_to_replace']
+    neuron_used_indices = net_layer.eligibility_count.argsort()
+    replace_indices = neuron_used_indices[0:number_to_replace]
+    samples_tmp = net_layer.input[:,mask]
+    samples = samples_tmp[:,0:number_to_replace]
+    net_layer.centroids[replace_indices,:] = samples.transpose()
+    #TODO: weighted euclidean stuff here
 
+    #set the neurons we replaced to most used
+    net_layer.eligibility_count[replace_indices] += 1.0 #np.max(net_layer.eligibility_count)
+
+def load_newsgroup_data(indices_to_load,dataset,p,max_features):
+    f_handle = h5py.File('/home/bgoodric/research/python/nn_experiments/data/dataset_20newsgroups_'+str(max_features)+'.h5py','r')
+    if(dataset == 'training'):
+        sample_data  = f_handle['train_data']
+        labels= f_handle['train_class']
+    if(dataset == 'testing'):
+        sample_data  = f_handle['test_data']
+        labels = f_handle['test_class']
+    
+    class_count = max(labels) + 1
     #build classification data in the form of neuron outputs
-    class_data = np.ones((labels.shape[0],10))*p['incorrect_target']
+    class_data = np.ones((labels.shape[0],class_count))*p['incorrect_target']
     for i in range(labels.shape[0]):
         class_data[i,labels[i]] = 1.0;
 
@@ -77,18 +87,22 @@ def normalize_data(data,means,stds):
     data_reduced[data_reduced < -1.5] = -1.5
     return data_reduced
 
-P1_list = list(p['P1_list'][1:])
-P1_list = [int(x) for x in P1_list]
-P2_list = list(p['P2_list'][1:])
-P2_list = [int(x) for x in P2_list]
+P1_list = p['P1_list'][1:]
+P1_list = [int(x) for x in P1_list.split('L')]
+P2_list = p['P2_list'][1:]
+P2_list = [int(x) for x in P2_list.split('L')]
+#P1_list = [int(x) for x in P1_list]
+#P2_list = [int(x) for x in P2_list]
+print('P1_list: ' + str(P1_list))
+print('P2_list: ' + str(P2_list))
+
 total_list = P1_list + P2_list
 
 print("Loading Data...")
 #get only first 4 digits
-(data_full,class_data) = load_data(tuple(total_list),"training",p)
-(test_data_full,test_class_data) = load_data(tuple(total_list),"testing",p)
+(data_full,class_data) = load_newsgroup_data(tuple(total_list),"training",p,2000)
+(test_data_full,test_class_data) = load_newsgroup_data(tuple(total_list),"testing",p,2000)
 train_size = data_full.shape[0]
-
 print("Splitting classes")
 #Only get classes for 1,2,3,4
 #class_data = class_data[:,1:5]
@@ -117,13 +131,6 @@ num_labels = len(P1_list)
 print("P1 Samples: " + str(np.sum(P1_mask)) + " P2 Samples: " + str(np.sum(P2_mask)))
 print("P2 Test Samples: " + str(np.sum(P1_test_mask)) + " P2 Test Samples: " + str(np.sum(P2_test_mask)))
 
-print("Doing PCA Reduction...")
-reduce_to = p['reduce_to']
-
-#pca reduce
-(pca_transform,data_means) = pca_reduce(data_full)
-data_reduced = np.dot(data_full,pca_transform[:,0:reduce_to])
-test_data_reduced = np.dot(test_data_full,pca_transform[:,0:reduce_to])
 
 print("Normalizing...")
 #we should normalize the pca reduced data
@@ -131,8 +138,15 @@ if(p.has_key('skip_pca') and p['skip_pca'] == True):
     print("Skipping PCA Reduction...")
     data_reduced = data_full
     test_data_reduced = test_data_full
-    reduce_to = 28*28;
+    reduce_to = data_full.shape[1];
 else:
+    print("Doing PCA Reduction...")
+    reduce_to = p['reduce_to']
+
+    #pca reduce
+    (pca_transform,data_means) = pca_reduce(data_full)
+    data_reduced = np.dot(data_full,pca_transform[:,0:reduce_to])
+    test_data_reduced = np.dot(test_data_full,pca_transform[:,0:reduce_to])
     pca_data_means = np.mean(data_reduced,axis=0)
     pca_data_std = np.std(data_reduced,axis=0)
     data_reduced = normalize_data(data_reduced,pca_data_means,pca_data_std)
@@ -224,7 +238,6 @@ np.random.seed(p['random_seed']);
 
 #init net
 net = nnet.net(layers)
-
 if(p.has_key('cluster_func') and p['cluster_func'] is not None):
 #    net.layer[0].centroids = np.asarray((((np.random.random((net.layer[0].weights.shape)) - 0.5)*2.0)),np.float32)
     net.layer[0].centroids = np.asarray(((np.ones((net.layer[0].weights.shape))*10.0)),np.float32)
@@ -236,25 +249,39 @@ if(p.has_key('cluster_func') and p['cluster_func'] is not None):
         net.layer[0].do_cosinedistance = True
         print('cosine set to true')
 
-if(p.has_key('cluster_func2') and p['cluster_func2'] is not None):
-    net.layer[1].centroids = np.asarray((((np.random.random((net.layer[1].weights.shape)) - 0.5)*2.0)),np.float32)
+if(p.has_key('num_hidden2') and p.has_key('cluster_func2') and p['cluster_func2'] is not None):
+#    net.layer[0].centroids = np.asarray((((np.random.random((net.layer[0].weights.shape)) - 0.5)*2.0)),np.float32)
+    net.layer[1].centroids = np.asarray(((np.ones((net.layer[1].weights.shape))*10.0)),np.float32)
     net.layer[1].select_func = csf.select_names[p['cluster_func2']]
-    net.layer[1].centroid_speed = p['cluster_speed2']
-    net.layer[1].num_selected = p['clusters_selected2']
+    print('cluster_func: ' + str(csf.select_names[p['cluster_func2']]))
+    net.layer[1].centroid_speed = p['cluster_speed']
+    net.layer[1].num_selected = p['clusters_selected']
     if(p.has_key('do_cosinedistance') and p['do_cosinedistance']):
-        net.layer[0].do_cosinedistance = True
+        net.layer[1].do_cosinedistance = True
+        print('cosine set to true')
 
-if(p.has_key('cluster_func3') and p['cluster_func3'] is not None):
-    net.layer[2].centroids = np.asarray((((np.random.random((net.layer[2].weights.shape)) - 0.5)*2.0)),np.float32)
+if(p.has_key('num_hidden3') and p.has_key('cluster_func3') and p['cluster_func3'] is not None):
+#    net.layer[0].centroids = np.asarray((((np.random.random((net.layer[0].weights.shape)) - 0.5)*2.0)),np.float32)
+    net.layer[2].centroids = np.asarray(((np.ones((net.layer[2].weights.shape))*10.0)),np.float32)
     net.layer[2].select_func = csf.select_names[p['cluster_func3']]
-    net.layer[2].centroid_speed = p['cluster_speed3']
-    net.layer[2].num_selected = p['clusters_selected3']
+    print('cluster_func: ' + str(csf.select_names[p['cluster_func3']]))
+    net.layer[2].centroid_speed = p['cluster_speed']
+    net.layer[2].num_selected = p['clusters_selected']
     if(p.has_key('do_cosinedistance') and p['do_cosinedistance']):
-        net.layer[0].do_cosinedistance = True
+        net.layer[2].do_cosinedistance = True
+        print('cosine set to true')
 
 save_interval = p['save_interval']
 
 save_time = time.time()
+
+test_missed_percent1 = 1.0
+test_missed_percent2 = 1.0
+
+best_percent_missed1 = 1.0
+best_percent_missed2 = 1.0
+best_percent_missed1_epoch = 0
+best_percent_missed2_epoch = 0
 
 #these are the variables to save
 train_mse_list = [];
@@ -271,7 +298,14 @@ test_missed_percent2_list = [];
 
 training_mode_list = [];
 
-shuffle_rate = p['shuffle_rate'];
+if(p.has_key('shuffle_rate')):
+    shuffle_rate = p['shuffle_rate']
+if(p.has_key('shuffle_type')):
+    shuffle_type = p['shuffle_type']
+if(p.has_key('shuffle_missed_percent')):
+    shuffle_missed_percent = p['shuffle_missed_percent']
+if(p.has_key('shuffle_max_epochs')):
+    shuffle_max_epochs = p['shuffle_max_epochs']
 
 training_mode = MODE_P1
 (sample_data,class_data) = (sample_data1,class_data1)
@@ -291,12 +325,36 @@ number_to_replace = p['number_to_replace']
 error_difference_threshold = p['error_difference_threshold']
 var_alpha = p['var_alpha']
 
+do_clustering = False
+if(p.has_key('cluster_func') and p['cluster_func'] is not None):
+    do_clustering = True
+if(p.has_key('cluster_func2') and p['cluster_func2'] is not None):
+    do_clustering = True
+if(p.has_key('cluster_func3') and p['cluster_func3'] is not None):
+    do_clustering = True
+
+shuffle_epoch = -1
+
 print("Begin Training...")
 for i in range(training_epochs):
-
     do_shuffle = False
-    if(i > 0 and (not (i%shuffle_rate))):
-        do_shuffle = True
+    if(shuffle_type == 'shuffle_rate'):
+        if(i > 0 and (not (i%shuffle_rate))):
+            do_shuffle = True
+    elif(shuffle_type == 'missed_percent'):
+        if(test_missed_percent1 < shuffle_missed_percent):
+            shuffle_epoch = i
+            do_shuffle = True
+            shuffle_type = '' #don't shuffle again
+    elif(shuffle_type == 'no_improvement'):
+        if(training_mode == MODE_P1 and (i > best_percent_missed1_epoch + shuffle_max_epochs)):
+            print('It has been '+str(shuffle_max_epochs)+' epochs since last improvement...')
+            best_percent_missed2 = i #make sure to reset the counter
+            shuffle_epoch = i
+            do_shuffle = True
+        if(training_mode == MODE_P2 and (i > best_percent_missed2_epoch + shuffle_max_epochs)):
+            print('It has been '+str(shuffle_max_epochs)+' epochs since last improvement... quitting...')
+            save_and_exit=True
 
     if(do_shuffle):
         #if we're in mode P2, then we need to switch to mode P1
@@ -312,7 +370,7 @@ for i in range(training_epochs):
     train_size = sample_data.shape[0]
     minibatch_count = int(train_size/minibatch_size)
     
-    #shuffle data
+    #randomize data order
     rng_state = np.random.get_state();
     np.random.shuffle(sample_data)
     np.random.set_state(rng_state)
@@ -333,13 +391,8 @@ for i in range(training_epochs):
         #    classification = classification[2:4,:]
         net.feed_forward()
         net.error = net.output - classification
-        guess = np.argmax(net.output,0)
-        c = np.argmax(classification,0)
-        train_mse = train_mse + np.sum(net.error**2)
-        train_missed = train_missed + np.sum(c != guess)
 
-        net.back_propagate()
-        if(p.has_key('cluster_func') and p['cluster_func'] is not None):
+        if(do_clustering):
             #between back_propagate and update weights, we check for errors
             for l in range(num_labels):
                 #Get a mask that tells which elements refer to this label
@@ -350,53 +403,49 @@ for i in range(training_epochs):
                 error_mean_difference[l] = error_mean[l]/error_mean_avg[l]
                 error_mean_avg[l] = var_alpha*error_mean_avg[l] + (1.0 - var_alpha)*error_mean[l]
         
-            neuron_used_indices = net.layer[0].eligibility_count.argsort()
             for l in range(num_labels):
                 #if we have threshold_cheat on then it automatically lays down centroids when P1->P2 switch occurs, else try to detect it using threshold
                 exceeded = False
 
                 if(p.has_key('threshold_cheat') and p['threshold_cheat'] is not None):
                     #on very first minibatch of new epoch, do switch
-                    if((not (i%shuffle_rate)) and j == 0):
+                    if((i == 0 or do_shuffle) and j == 0):
                         exceeded = True
                 elif(error_mean_difference[l] > error_difference_threshold):
                     exceeded = True
                 if(exceeded):
-                    print("ERROR EXCEEDED TRESHOLD FOR LABEL " + str(l))
                     error_thresh_list.append((i,l))
-                    #get the 8 least selected neurons
-                    replace_indices = neuron_used_indices[0:number_to_replace]
-                    #print("replace indices: " + str(replace_indices))
-                    neuron_used_indices = neuron_used_indices[number_to_replace:]
-                    #need some sample data points -- could use k-means -- for now sample randomly
-                    #samples is S x N where S is number of samples, and N is input size
                     mask = np.equal(l,np.argmax(classification,0))
-                    sample_data_tmp = train_sample_data[:,mask]
-                    samples = sample_data_tmp[:,0:number_to_replace]
-
-                    #need to tack on the bias
-                    samples = np.append(samples,np.ones((1,samples.shape[1]),dtype=samples.dtype),axis=0)
-            
-                    #replace centroids with new ones drawn from samples
-                    net.layer[0].centroids[replace_indices,:] = samples.transpose()
-                    if(p.has_key('do_weighted_euclidean') and p['do_weighted_euclidean']):
-                        net.layer[0].centroids[replace_indices,:] = net.layer[0].centroids[replace_indices,:]*net.layer[0].weights[replace_indices,:]
-
-                    #reset error mean
-                    #add a bit of a bias, to ensure it doesn't exceed the threshold immediately again
+                    print("ERROR EXCEEDED TRESHOLD FOR LABEL " + str(l))
+                    for layer_num in range(len(net.layer)):
+                        str_list = ("","2","3","final")
+                        str_to_append = str_list[layer_num]
+                        if(p.has_key('cluster_func' + str_to_append) and p['cluster_func' + str_to_append] is not None):
+                            net.feed_forward()
+                            net.error = net.output - classification
+                            replace_centroids(net.layer[layer_num],mask)
+                    #ensure error does not jump up again immediately
                     error_mean_avg[l] = error_mean[l] + 1.0
-            #Append error mean difference for each class label to the log
-            error_mean_difference_log.append(np.copy(error_mean_difference));
+
+        guess = np.argmax(net.output,0)
+        c = np.argmax(classification,0)
+        train_mse = train_mse + np.sum(net.error**2)
+        train_missed = train_missed + np.sum(c != guess)
+
+        #Append error mean difference for each class label to the log
+        error_mean_difference_log.append(np.copy(error_mean_difference));
 
 #    np.savetxt("dmp/distances_epoch" + str(epoch) + ".csv",net.layer[0].distances,delimiter=",");
         #print(net.layer[0].saved_selected_neurons)
+        net.back_propagate()
         net.update_weights()
+        
 #        print("selected is zero: " + str( np.sum(net.layer[0].saved_selected_neurons == 0,axis=0)))
 #        print("output is not zero: " + str( np.sum(net.layer[0].output != 0,axis=0)))
 #        import pdb; pdb.set_trace();
         #update cluster centroids
         for k in range(len(net.layer)):
-            str_list = ("","2","3")
+            str_list = ("","2","3","final")
             str_to_append = str_list[k]
             if(p.has_key('cluster_func' + str_to_append) and p['cluster_func' + str_to_append] is not None):
                 csf.update_names[p['cluster_func' + str_to_append]](net.layer[k])
@@ -451,12 +500,21 @@ for i in range(training_epochs):
 #    + " mse_new: " + "{:8.4f}".format(test_mse_new) + " acc_new: " + "{:.4f}".format(test_accuracy_new))
     time_elapsed = time.time() - t
     t = time.time()
+
+    if(best_percent_missed1 > test_missed_percent1):
+        best_percent_missed1 = test_missed_percent1
+        best_percent_missed1_epoch = i
+
+    if(best_percent_missed2 > test_missed_percent2):
+        best_percent_missed2 = test_missed_percent2
+        best_percent_missed2_epoch = i
+
     print('Train :               epoch ' + "{0: 4d}".format(i) +
     " mse: " + "{0:<8.4f}".format(train_mse) + " percent missed: " + "{0:<8.4f}".format(train_missed_percent) + str(time_elapsed))
     print('Test 1: (P1 Weights): epoch ' + "{0: 4d}".format(i) + 
-    " mse: " + "{0:<8.4f}".format(test_mse1) + " missed: " + "{0: 5d}".format(test_missed1) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent1));
+    " mse: " + "{0:<8.4f}".format(test_mse1) + " missed: " + "{0: 5d}".format(test_missed1) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent1) + " * {0:<8.4f}".format(best_percent_missed1));
     print('Test 2: (P2 weights): epoch ' + "{0: 4d}".format(i) +
-    " mse: " + "{0:<8.4f}".format(test_mse2) + " missed: " + "{0: 5d}".format(test_missed2) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent2));
+    " mse: " + "{0:<8.4f}".format(test_mse2) + " missed: " + "{0: 5d}".format(test_missed2) + " percent missed: " + "{0:<8.4f}".format(test_missed_percent2) + " * {0:<8.4f}".format(best_percent_missed2));
 
     #f_out.write(str(train_mse) + "," + str(train_missed_percent) + "," + str(test_missed_percent) + "\n")
     if(time.time() - save_time > save_interval or i == training_epochs-1 or save_and_exit==True):
@@ -480,7 +538,8 @@ for i in range(training_epochs):
         f_handle['error_thresh_list'] = np.array(error_thresh_list)
         f_handle['error_mean_difference_log'] = np.array(error_mean_difference_log)
         f_handle['minibatch_count'] = minibatch_count
-   
+        f_handle['shuffle_epoch'] = int(shuffle_epoch)
+
         #iterate through all parameters and save them in the parameters group
         p_group = f_handle.create_group('parameters');
         for param in p.iteritems():

@@ -83,7 +83,7 @@ test_size  = test_data.shape[0]
 input_size = sample_data.shape[1]
 
 #cluster using k-means
-num_centroids = p['num_centroids']
+num_centroids = int(p['num_centroids'])
 
 select_indices = np.random.randint(60000,size=num_centroids);
 
@@ -109,7 +109,7 @@ def do_kmeans(sample_data):
             matching = np.sum(distances_indices == distances_indices_old)
         distances_indices_old = np.copy(distances_indices)
         unused = 0
-        for k in range(num_centroids):
+        for k in range(int(num_centroids)):
             #TODO: check if none belong to this centroid
             if(np.sum(distances_indices == k) == 0):
                 unused = unused + 1
@@ -182,6 +182,15 @@ test_mse_list = [];
 test_missed_list = [];
 test_missed_percent_list = [];
 
+best_missed_percent = 1.0
+best_epoch=1
+
+end_type = 'fixed'
+if(p.has_key('end_type')):
+    end_type = p['end_type']
+if(p.has_key('num_epochs')):
+    num_epochs = p['num_epochs']
+
 minibatch_size = p['minibatch_size']
 save_interval = p['save_interval']
 save_and_exit=False
@@ -241,6 +250,14 @@ for i in range(training_epochs):
     test_missed_list.append(test_missed)
     test_missed_percent_list.append(test_missed_percent)
 
+    #record best
+    if(best_missed_percent >= test_missed_percent):
+        best_missed_percent = test_missed_percent
+        best_epoch = i
+
+    if(end_type == 'no_improvement' and i > (best_epoch + num_epochs)):
+        save_and_exit = True
+
     train_mse = float(train_mse)/float(train_size)
     time_elapsed = time.time() - t
     t = time.time()
@@ -250,12 +267,13 @@ for i in range(training_epochs):
     " mse: " + "{0:<8.4f}".format(train_mse) + " percent missed: " + "{0:<8.4f}".format(train_missed_percent) + str(time_elapsed))
     print('Test  : (P1 Weights): epoch ' + "{0: 4d}".format(i) +
     " mse: " + "{0:<8.4f}".format(test_mse) + " missed: " + "{0: 5d}".format(test_missed) +
-    " percent missed: " + "{0:<8.4f}".format(test_missed_percent));
+    " percent missed: " + "{0:<8.4f}".format(test_missed_percent) + "* {0:<8.4f}".format(best_missed_percent))
 
     mse_list.append(train_mse)
+
     if(time.time() - save_time > save_interval or i == training_epochs-1 or save_and_exit==True):
         print('saving results...');
-        f = h5.File(str(p['results_dir']) + str(p['simname']) + '_' + str(p['version']) + '.h5py','w')
+        f = h5.File(str(p['results_dir']) + str(p['simname']) + str(p['version']) + '.h5py','w')
         if(hasattr(net.layer[0],'centroids')):
             f['centroids'] = net.layer[0].centroids
         f['weights_0'] = net.layer[0].weights
@@ -279,3 +297,5 @@ for i in range(training_epochs):
         f.close()
         save_time = time.time()
 
+        if(save_and_exit):
+            break
