@@ -11,23 +11,25 @@ data_dir = '../data/'
 
 use_float32=True
 
-incorrect_target = -1.0
+incorrect_target = 0.0
 correct_target = 1.0
 
 skip_pca = False
 threshold_cheat = True
 
-P1_list='L12349'
-P2_list='L56780'
+num_samples = 200000
 
-num_hidden = 2048
-num_hidden2 = 2048
+random_variance=2.0
+
+num_hidden = 128
+nodes_per_group=8
+#num_hidden2 = 1024
 #num_hidden3 = 2048
 
-activation_function='tanh'
+activation_function='maxout'
 activation_function2='tanh'
 activation_function3='tanh'
-activation_function_final='tanh'
+activation_function_final='softmax'
 
 momentum=0.0
 momentum2=0.0
@@ -50,10 +52,10 @@ sparse_target3=None
 minibatch_size=1024
 
 #per layer learning rates
-learning_rate =       0.005
-learning_rate2 =      0.005
-learning_rate3 =      0.005
-learning_rate_final = 0.005
+learning_rate =       0.001
+learning_rate2 =      0.001
+learning_rate3 =      0.001
+learning_rate_final = 0.001
 
 training_epochs = 3000
 
@@ -61,16 +63,17 @@ training_epochs = 3000
 #shuffle_rate = 300
 
 shuffle_type = 'no_improvement'
-shuffle_max_epochs = 100
+shuffle_max_epochs = 10
 
 var_alpha = 0.95
 error_difference_threshold = 2.5
 
 #PCA Reduction factor
-reduce_to = 50
+reduce_to = 75
+scale = 6
 
 #can be normal or weighted
-cluster_func  =  'cluster_func'
+cluster_func  =  None
 #cluster_func2 =  'cluster_func'
 #cluster_func3 =  'cluster_func'
 

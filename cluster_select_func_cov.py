@@ -22,7 +22,7 @@ def cluster_select_func(self):
                 np.sum(self.input**2,0)[np.newaxis,:]
     distances_sorted = np.sort(self.distances,axis=0)
 #    print("distances_sorted " + str(distances_sorted[0:10,0]))
-    self.selected_neurons = self.distances > distances_sorted[num_selected,:]
+    self.selected_neurons = self.distances > distances_sorted[int(num_selected),:]
     #keep track of this so we can count the number of times a centroid was selected
     self.saved_selected_neurons = np.copy(self.selected_neurons)
     
@@ -64,8 +64,27 @@ def cluster_cov_select_func(self):
     #self.distances = pairwise_distances(self.centroids,self.input.T)
 
     #use mahalanobis
-    S = np.eye(self.centroids.shape[1])
-    self.distances = pairwise_distances(self.centroids,self.input.T,metric='mahalanobis',VI=S)
+    self.distances = np.ones((self.centroids.shape[0],self.input.shape[1]))*1e10
+    if(self.num_covariances == 0):
+        S = np.eye(self.centroids.shape[1])
+        #print("S Shape: " + str(S.shape))
+        self.distances = pairwise_distances(self.centroids,self.input.T,metric='mahalanobis',VI=S)
+        #print("bleh")
+    for i in range(self.num_covariances):
+        #print("S_list[i] Shape: " + str(self.S_list[i].shape))
+        cov_mask = self.cov_to_use == i
+        #print("distances sum: " + str(np.sum(self.distances)))
+        #print("cov_mask shape: " + str(cov_mask.shape))
+        #print("cov_mask sum: " + str(np.sum(cov_mask)))
+        #print("centroids shape: " + str(self.centroids.shape))
+        centroids_with_label = self.centroids[cov_mask,:]
+        #print("centroids_with_label shape: " + str(centroids_with_label.shape))
+        distances_tmp = pairwise_distances(centroids_with_label,self.input.T,metric='mahalanobis',VI=self.S_list[i])
+        self.distances[cov_mask,:] = distances_tmp
+        #print("distances shape: " + str(self.distances.shape))
+        #print("input shape: " + str(self.input.shape))
+    #print(str(self.distances))
+    #print("distances sum2: " + str(np.sum(self.distances)))
 
     #self.distances = cdist(self.centroids,self.input.T,'euclidean')
 
@@ -77,7 +96,7 @@ def cluster_cov_select_func(self):
 
     distances_sorted = np.sort(self.distances,axis=0)
 #    print("distances_sorted " + str(distances_sorted[0:10,0]))
-    self.selected_neurons = self.distances > distances_sorted[num_selected,:]
+    self.selected_neurons = self.distances > distances_sorted[int(num_selected),:]
     #keep track of this so we can count the number of times a centroid was selected
     self.saved_selected_neurons = np.copy(self.selected_neurons)
     

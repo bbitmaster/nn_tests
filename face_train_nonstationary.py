@@ -10,6 +10,8 @@ import time
 #h5py used for saving results to a file
 import h5py
 
+from face_loader import load_face_data 
+
 #constants
 MODE_P1 = 0
 MODE_P2 = 1
@@ -43,30 +45,6 @@ def replace_centroids(net_layer,mask):
     #set the neurons we replaced to most used
     net_layer.eligibility_count[replace_indices] += 1.0 #np.max(net_layer.eligibility_count)
 
-def load_data(digits,dataset,p):
-    images, labels = read_mnist(digits,dataset,path=p['data_dir']);
-    labels = labels.transpose()[0] #put labels in an array
-    images = np.float64(images)
-    #(normalize between 0-1)
-    images /= 255.0 
-    #normalize between -1 and 1 for hyperbolic tangent
-    images = images - 0.5;
-    images = images*2.0; 
-    
-    train_size = labels.shape[0]
-    sample_data = images.reshape(train_size,28*28)
-
-    #build classification data in the form of neuron outputs
-    class_data = np.ones((labels.shape[0],10))*p['incorrect_target']
-    for i in range(labels.shape[0]):
-        class_data[i,labels[i]] = 1.0;
-
-    if(p['use_float32']):
-        sample_data = np.asarray(sample_data,np.float32)
-        class_data = np.asarray(class_data,np.float32)
-
-    return (sample_data,class_data)
-
 def pca_reduce(data):
     data_means = np.mean(data,axis=0)
     data = np.copy(data - data_means)
@@ -87,16 +65,29 @@ def normalize_data(data,means,stds):
     data_reduced[data_reduced < -1.5] = -1.5
     return data_reduced
 
-P1_list = list(p['P1_list'][1:])
-P1_list = [int(x) for x in P1_list]
-P2_list = list(p['P2_list'][1:])
-P2_list = [int(x) for x in P2_list]
+P1_list = p['P1_list'][1:]
+P1_list = [int(x) for x in P1_list.split('L')]
+P2_list = p['P2_list'][1:]
+P2_list = [int(x) for x in P2_list.split('L')]
+#P1_list = [int(x) for x in P1_list]
+#P2_list = [int(x) for x in P2_list]
+print('P1_list: ' + str(P1_list))
+print('P2_list: ' + str(P2_list))
+
 total_list = P1_list + P2_list
 
+print("total list: " + str(total_list))
+
 print("Loading Data...")
-#get only first 4 digits
-(data_full,class_data) = load_data(tuple(total_list),"training",p)
-(test_data_full,test_class_data) = load_data(tuple(total_list),"testing",p)
+#account for missing #14
+face_id_list = []
+for n in total_list:
+    n = n+1
+    if(n > 13):
+        n = n+1
+    face_id_list.append(n)
+print("face_id_list: " + str(face_id_list))
+(data_full,class_data,test_data_full,test_class_data,bad_images) = load_face_data(face_id_list,2,5)
 train_size = data_full.shape[0]
 
 print("Splitting classes")
@@ -141,7 +132,7 @@ if(p.has_key('skip_pca') and p['skip_pca'] == True):
     print("Skipping PCA Reduction...")
     data_reduced = data_full
     test_data_reduced = test_data_full
-    reduce_to = 28*28;
+    reduce_to = data_full.shape[1];
 else:
     pca_data_means = np.mean(data_reduced,axis=0)
     pca_data_std = np.std(data_reduced,axis=0)

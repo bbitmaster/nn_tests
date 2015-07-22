@@ -10,6 +10,8 @@ import time
 #h5py used for saving results to a file
 import h5py
 
+from gas_loader import load_gas_data 
+
 #constants
 MODE_P1 = 0
 MODE_P2 = 1
@@ -43,30 +45,6 @@ def replace_centroids(net_layer,mask):
     #set the neurons we replaced to most used
     net_layer.eligibility_count[replace_indices] += 1.0 #np.max(net_layer.eligibility_count)
 
-def load_data(digits,dataset,p):
-    images, labels = read_mnist(digits,dataset,path=p['data_dir']);
-    labels = labels.transpose()[0] #put labels in an array
-    images = np.float64(images)
-    #(normalize between 0-1)
-    images /= 255.0 
-    #normalize between -1 and 1 for hyperbolic tangent
-    images = images - 0.5;
-    images = images*2.0; 
-    
-    train_size = labels.shape[0]
-    sample_data = images.reshape(train_size,28*28)
-
-    #build classification data in the form of neuron outputs
-    class_data = np.ones((labels.shape[0],10))*p['incorrect_target']
-    for i in range(labels.shape[0]):
-        class_data[i,labels[i]] = 1.0;
-
-    if(p['use_float32']):
-        sample_data = np.asarray(sample_data,np.float32)
-        class_data = np.asarray(class_data,np.float32)
-
-    return (sample_data,class_data)
-
 def pca_reduce(data):
     data_means = np.mean(data,axis=0)
     data = np.copy(data - data_means)
@@ -87,17 +65,85 @@ def normalize_data(data,means,stds):
     data_reduced[data_reduced < -1.5] = -1.5
     return data_reduced
 
-P1_list = list(p['P1_list'][1:])
-P1_list = [int(x) for x in P1_list]
-P2_list = list(p['P2_list'][1:])
-P2_list = [int(x) for x in P2_list]
-total_list = P1_list + P2_list
+#P1_list = p['P1_list'][1:]
+#P1_list = [int(x) for x in P1_list.split('L')]
+#P2_list = p['P2_list'][1:]
+#P2_list = [int(x) for x in P2_list.split('L')]
+#P1_list = [int(x) for x in P1_list]
+#P2_list = [int(x) for x in P2_list]
+#print('P1_list: ' + str(P1_list))
+#print('P2_list: ' + str(P2_list))
+
+#total_list = P1_list + P2_list
+
+#print("total list: " + str(total_list))
 
 print("Loading Data...")
-#get only first 4 digits
-(data_full,class_data) = load_data(tuple(total_list),"training",p)
-(test_data_full,test_class_data) = load_data(tuple(total_list),"testing",p)
-train_size = data_full.shape[0]
+(data_full,class_data) = load_gas_data(p['num_samples'],p['correct_target'],p['incorrect_target'])
+
+num_samples = data_full.shape[0]
+
+np.random.seed(p['random_seed']);
+rng_state = np.random.get_state();
+np.random.shuffle(data_full)
+np.random.set_state(rng_state)
+np.random.shuffle(class_data)
+
+test_size = int(num_samples*0.05)
+train_size = num_samples - test_size
+
+sample_data1 = np.copy(data_full[0:train_size,:])
+class_data1 = np.copy(class_data[0:train_size,:])
+
+#test_data1 = np.copy(data_full[0:train_size,:])
+#test_class1 = np.copy(class_data[0:train_size,:])
+
+
+test_data1 = np.copy(data_full[train_size:num_samples,:])
+test_class1 = np.copy(class_data[train_size:num_samples,:])
+
+sample_data2 = np.copy(sample_data1)
+test_data2 = np.copy(test_data1)
+
+#shuffle test and train in the same way
+rng_state = np.random.get_state();
+np.random.shuffle(sample_data2.transpose())
+np.random.set_state(rng_state)
+np.random.shuffle(test_data2.transpose())
+
+class_data2 = np.copy(class_data1)
+test_class2 = np.copy(test_class1)
+
+class_data1 = class_data1.transpose()
+class_data2 = class_data2.transpose()
+
+test_class1 = test_class1.transpose()
+test_class2 = test_class2.transpose()
+
+print(test_class1[0:5,:])
+print(test_class2[0:5,:])
+
+
+if(p.has_key('random_variance')):
+    print("adding noise variance: " + str(p['random_variance']))
+    sample_data1 = sample_data1 + np.random.normal(0,float(p['random_variance']),sample_data1.shape)
+    sample_data2 = sample_data2 + np.random.normal(0,float(p['random_variance']),sample_data2.shape)
+    sample_data1 = np.asarray(sample_data1,np.float32)
+    sample_data2 = np.asarray(sample_data2,np.float32)
+    sample_data1[sample_data1 > 1.5] = 1.5
+    sample_data1[sample_data1 < -1.5] = -1.5
+    sample_data2[sample_data2 > 1.5] = 1.5
+    sample_data2[sample_data2 < -1.5] = -1.5
+
+
+
+#print(sample_data1[0,:])
+#print(sample_data2[0,:])
+#print(test2[0,:])
+#print(sample_data2[0,:])
+
+print("train size: " + str(train_size))
+print("test size: " + str(test_size))
 
 print("Splitting classes")
 #Only get classes for 1,2,3,4
@@ -105,79 +151,74 @@ print("Splitting classes")
 #test_class_data = test_class_data[:,1:5]
 
 #split data into two parts P1 and P2, based on class
-P1_mask = (np.argmax(class_data,axis=1) == P1_list[0])
-for d in P1_list:
-    P1_mask = np.logical_or(P1_mask,(np.argmax(class_data,axis=1) == d))
+#P1_mask = (np.argmax(class_data,axis=1) == P1_list[0])
+#for d in P1_list:
+#    P1_mask = np.logical_or(P1_mask,(np.argmax(class_data,axis=1) == d))
 
-P2_mask = (np.argmax(class_data,axis=1) == P2_list[0])
-for d in P2_list:
-    P2_mask = np.logical_or(P2_mask,(np.argmax(class_data,axis=1) == d))
+#P2_mask = (np.argmax(class_data,axis=1) == P2_list[0])
+#for d in P2_list:
+#    P2_mask = np.logical_or(P2_mask,(np.argmax(class_data,axis=1) == d))
 
 #split test into two parts P1 and P2 based on Class
-P1_test_mask = (np.argmax(test_class_data,axis=1) == P1_list[0])
-for d in P1_list:
-    P1_test_mask = np.logical_or(P1_test_mask,(np.argmax(test_class_data,axis=1) == d))
+#P1_test_mask = (np.argmax(test_class_data,axis=1) == P1_list[0])
+#for d in P1_list:
+#    P1_test_mask = np.logical_or(P1_test_mask,(np.argmax(test_class_data,axis=1) == d))
 
-P2_test_mask = (np.argmax(test_class_data,axis=1) == P2_list[0])
-for d in P2_list:
-    P2_test_mask = np.logical_or(P2_test_mask,(np.argmax(test_class_data,axis=1) == d))
+#P2_test_mask = (np.argmax(test_class_data,axis=1) == P2_list[0])
+#for d in P2_list:
+#    P2_test_mask = np.logical_or(P2_test_mask,(np.argmax(test_class_data,axis=1) == d))
 
-num_labels = len(P1_list)
+num_labels = 2
 
-print("P1 Samples: " + str(np.sum(P1_mask)) + " P2 Samples: " + str(np.sum(P2_mask)))
-print("P2 Test Samples: " + str(np.sum(P1_test_mask)) + " P2 Test Samples: " + str(np.sum(P2_test_mask)))
+#print("P1 Samples: " + str(np.sum(P1_mask)) + " P2 Samples: " + str(np.sum(P2_mask)))
+#print("P2 Test Samples: " + str(np.sum(P1_test_mask)) + " P2 Test Samples: " + str(np.sum(P2_test_mask)))
 
-print("Doing PCA Reduction...")
-reduce_to = p['reduce_to']
+#print("Doing PCA Reduction...")
+#reduce_to = p['reduce_to']
 
 #pca reduce
-(pca_transform,data_means) = pca_reduce(data_full)
-data_reduced = np.dot(data_full,pca_transform[:,0:reduce_to])
-test_data_reduced = np.dot(test_data_full,pca_transform[:,0:reduce_to])
+#(pca_transform,data_means) = pca_reduce(data_full)
+#data_reduced = np.dot(data_full,pca_transform[:,0:reduce_to])
+#test_data_reduced = np.dot(test_data_full,pca_transform[:,0:reduce_to])
 
 print("Normalizing...")
 #we should normalize the pca reduced data
-if(p.has_key('skip_pca') and p['skip_pca'] == True):
-    print("Skipping PCA Reduction...")
-    data_reduced = data_full
-    test_data_reduced = test_data_full
-    reduce_to = 28*28;
-else:
-    pca_data_means = np.mean(data_reduced,axis=0)
-    pca_data_std = np.std(data_reduced,axis=0)
-    data_reduced = normalize_data(data_reduced,pca_data_means,pca_data_std)
-    test_data_reduced = normalize_data(test_data_reduced,pca_data_means,pca_data_std)
+#if(p.has_key('skip_pca') and p['skip_pca'] == True):
+#    print("Skipping PCA Reduction...")
+#data_reduced = data_full
+#test_data_reduced = test_data_full
+input_dims = data_full.shape[1];
+#else:
+#    pca_data_means = np.mean(data_reduced,axis=0)
+#    pca_data_std = np.std(data_reduced,axis=0)
+#    data_reduced = normalize_data(data_reduced,pca_data_means,pca_data_std)
+#    test_data_reduced = normalize_data(test_data_reduced,pca_data_means,pca_data_std)
 
-sample_data1 = data_reduced[P1_mask,:]
-sample_data2 = data_reduced[P2_mask,:]
+#sample_data1 = data_reduced[P1_mask,:]
+#sample_data2 = data_reduced[P2_mask,:]
 
-class_data1 = class_data[P1_mask,:]
-class_data2 = class_data[P2_mask,:]
+#class_data1 = class_data[P1_mask,:]
+#class_data2 = class_data[P2_mask,:]
 
-class_data1 = class_data1.transpose()
-class_data2 = class_data2.transpose()
+#class_data1 = class_data1.transpose()
+#class_data2 = class_data2.transpose()
 
-class_data1 = class_data1[P1_list,:]
-class_data2 = class_data2[P2_list,:]
+#class_data1 = class_data1[P1_list,:]
+#class_data2 = class_data2[P2_list,:]
 
 #make size of P1 and P2 the same size
-#sample_size = min(sample_data1.shape[0],sample_data2.shape[0])
-#sample_data1 = sample_data1[0:sample_size]
-#sample_data2 = sample_data2[0:sample_size]
-#class_data1 = class_data1[0:sample_size]
-#class_data2 = class_data2[0:sample_size]
 
-test_data1 = test_data_reduced[P1_test_mask,:]
-test_data2 = test_data_reduced[P2_test_mask,:]
+#test_data1 = test_data_reduced[P1_test_mask,:]
+#test_data2 = test_data_reduced[P2_test_mask,:]
 
-test_class_data1 = test_class_data[P1_test_mask,:]
-test_class_data2 = test_class_data[P2_test_mask,:]
+#test_class_data1 = test_class_data[P1_test_mask,:]
+#test_class_data2 = test_class_data[P2_test_mask,:]
 
-test_class1 = test_class_data1.transpose()
-test_class2 = test_class_data2.transpose()
+#test_class1 = test_class_data1.transpose()
+#test_class2 = test_class_data2.transpose()
 
-test_class1 = test_class1[P1_list,:]
-test_class2 = test_class2[P2_list,:]
+#test_class1 = test_class1[P1_list,:]
+#test_class2 = test_class2[P2_list,:]
 print("Network Initialization...")
 
 num_hidden = p['num_hidden']
@@ -202,7 +243,7 @@ else:
     nodes_per_group3 = None
 
 layers = [];
-layers.append(nnet.layer(reduce_to))
+layers.append(nnet.layer(input_dims))
 layers.append(nnet.layer(p['num_hidden'],p['activation_function'],nodes_per_group=nodes_per_group,
                          initialization_scheme=p['initialization_scheme'],
                          initialization_constant=p['initialization_constant'],

@@ -6,6 +6,7 @@ import cluster_select_func_cov as csf
 from autoconvert import autoconvert
 import sys
 import time
+from Shrink_Cov import Shrink_Cov
 
 #h5py used for saving results to a file
 import h5py
@@ -33,10 +34,20 @@ for i in range(2,len(sys.argv)):
     
 def replace_centroids(net_layer,mask):
     number_to_replace = p['number_to_replace']
+    #print(net_layer.eligibility_count)
     neuron_used_indices = net_layer.eligibility_count.argsort()
-    replace_indices = neuron_used_indices[0:number_to_replace]
+    #neuron_used_indices is an (num_centroids,) shapes array listing the indices of the most eligible neurons
+    replace_indices = neuron_used_indices[0:int(number_to_replace)]
+    #replace indices gives indices for the neurons to replace
     samples_tmp = net_layer.input[:,mask]
-    samples = samples_tmp[:,0:number_to_replace]
+    samples = samples_tmp[:,0:int(number_to_replace)]
+
+    S = Shrink_Cov(samples_tmp)
+    S_inv = np.linalg.inv(S[0])
+    net_layer.S_list.append(S_inv)
+    net_layer.cov_to_use[replace_indices] = net_layer.num_covariances
+    net_layer.num_covariances += 1
+
     net_layer.centroids[replace_indices,:] = samples.transpose()
     #TODO: weighted euclidean stuff here
 
@@ -253,6 +264,10 @@ if(p.has_key('cluster_func') and p['cluster_func'] is not None):
     print('cluster_func: ' + str(csf.select_names[p['cluster_func']]))
     net.layer[0].centroid_speed = p['cluster_speed']
     net.layer[0].num_selected = p['clusters_selected']
+    #covariance matrices
+    net.layer[0].S_list = []
+    net.layer[0].num_covariances=0
+    net.layer[0].cov_to_use = np.zeros(net.layer[0].weights.shape[0])
     if(p.has_key('do_cosinedistance') and p['do_cosinedistance']):
         net.layer[0].do_cosinedistance = True
         print('cosine set to true')
@@ -264,6 +279,10 @@ if(p.has_key('num_hidden2') and p.has_key('cluster_func2') and p['cluster_func2'
     print('cluster_func: ' + str(csf.select_names[p['cluster_func2']]))
     net.layer[1].centroid_speed = p['cluster_speed']
     net.layer[1].num_selected = p['clusters_selected']
+    net.layer[1].cov_to_use = np.zeros(net.layer[0].weights.shape[1])
+    #covariance matrices
+    net.layer[1].S_list = []
+    net.layer[1].num_covariances=0
     if(p.has_key('do_cosinedistance') and p['do_cosinedistance']):
         net.layer[1].do_cosinedistance = True
         print('cosine set to true')
@@ -275,6 +294,10 @@ if(p.has_key('num_hidden3') and p.has_key('cluster_func3') and p['cluster_func3'
     print('cluster_func: ' + str(csf.select_names[p['cluster_func3']]))
     net.layer[2].centroid_speed = p['cluster_speed']
     net.layer[2].num_selected = p['clusters_selected']
+    net.layer[2].cov_to_use = np.zeros(net.layer[2].weights.shape[1])
+    #covariance matrices
+    net.layer[2].S_list = []
+    net.layer[2].num_covariances=0
     if(p.has_key('do_cosinedistance') and p['do_cosinedistance']):
         net.layer[2].do_cosinedistance = True
         print('cosine set to true')
@@ -317,7 +340,7 @@ if(p.has_key('shuffle_max_epochs')):
 
 shuffle_epoch = -1
 quit_epoch = training_epochs
-p2_training_epochs = 300
+p2_training_epochs = 100
 
 training_mode = MODE_P1
 (sample_data,class_data) = (sample_data1,class_data1)
@@ -344,6 +367,7 @@ if(p.has_key('cluster_func2') and p['cluster_func2'] is not None):
     do_clustering = True
 if(p.has_key('cluster_func3') and p['cluster_func3'] is not None):
     do_clustering = True
+
 
 print("Begin Training...")
 for i in range(training_epochs):
@@ -429,6 +453,7 @@ for i in range(training_epochs):
                 if(exceeded):
                     error_thresh_list.append((i,l))
                     mask = np.equal(l,np.argmax(classification,0))
+                    #mask is a (minibatch_size,) shaped array of true/false values telling which entry matches the mask
                     print("ERROR EXCEEDED TRESHOLD FOR LABEL " + str(l))
                     for layer_num in range(len(net.layer)):
                         str_list = ("","2","3","final")

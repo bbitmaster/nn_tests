@@ -17,11 +17,11 @@ correct_target = 1.0
 skip_pca = False
 threshold_cheat = True
 
-P1_list='L12349'
-P2_list='L56780'
+P1_list='L0L1L2L3L4L5L6L7L8L9L10L11L12L13L14L15L16L17L18'
+P2_list='L19L20L21L22L23L24L25L26L27L28L29L30L31L32L33L34L35L36L37'
 
-num_hidden = 2048
-num_hidden2 = 2048
+num_hidden = 1024
+num_hidden2 = 1024
 #num_hidden3 = 2048
 
 activation_function='tanh'
@@ -50,10 +50,10 @@ sparse_target3=None
 minibatch_size=1024
 
 #per layer learning rates
-learning_rate =       0.005
-learning_rate2 =      0.005
-learning_rate3 =      0.005
-learning_rate_final = 0.005
+learning_rate =       0.1
+learning_rate2 =      0.1
+learning_rate3 =      0.1
+learning_rate_final = 0.1
 
 training_epochs = 3000
 
@@ -67,10 +67,11 @@ var_alpha = 0.95
 error_difference_threshold = 2.5
 
 #PCA Reduction factor
-reduce_to = 50
+reduce_to = 75
+scale = 6
 
 #can be normal or weighted
-cluster_func  =  'cluster_func'
+cluster_func  =  None
 #cluster_func2 =  'cluster_func'
 #cluster_func3 =  'cluster_func'
 
