@@ -89,6 +89,13 @@ np.random.shuffle(data_full)
 np.random.set_state(rng_state)
 np.random.shuffle(class_data)
 
+if(p.has_key('random_variance')):
+    print("adding noise variance: " + str(p['random_variance']))
+    data_full = data_full + np.random.normal(0,float(p['random_variance']),data_full.shape)
+    data_full[data_full > 1.5] = 1.5
+    data_full[data_full < -1.5] = -1.5
+    data_full = np.asarray(data_full,np.float32)
+
 test_size = int(num_samples*0.05)
 train_size = num_samples - test_size
 
@@ -123,17 +130,6 @@ test_class2 = test_class2.transpose()
 print(test_class1[0:5,:])
 print(test_class2[0:5,:])
 
-
-if(p.has_key('random_variance')):
-    print("adding noise variance: " + str(p['random_variance']))
-    sample_data1 = sample_data1 + np.random.normal(0,float(p['random_variance']),sample_data1.shape)
-    sample_data2 = sample_data2 + np.random.normal(0,float(p['random_variance']),sample_data2.shape)
-    sample_data1 = np.asarray(sample_data1,np.float32)
-    sample_data2 = np.asarray(sample_data2,np.float32)
-    sample_data1[sample_data1 > 1.5] = 1.5
-    sample_data1[sample_data1 < -1.5] = -1.5
-    sample_data2[sample_data2 > 1.5] = 1.5
-    sample_data2[sample_data2 < -1.5] = -1.5
 
 
 
@@ -273,16 +269,16 @@ layers.append(nnet.layer(num_labels,p['activation_function_final'],use_float32=p
 
 np.random.seed(p['random_seed']);
 
-if(p.has_key('random_variance')):
-    sample_data1 = sample_data1 + np.random.normal(0,float(p['random_variance']),sample_data1.shape)
-    sample_data2 = sample_data2 + np.random.normal(0,float(p['random_variance']),sample_data2.shape)
-    sample_data1 = np.asarray(sample_data1,np.float32)
-    sample_data2 = np.asarray(sample_data2,np.float32)
-    sample_data1[sample_data1 > 1.5] = 1.5
-    sample_data1[sample_data1 < -1.5] = -1.5
-    sample_data2[sample_data2 > 1.5] = 1.5
-    sample_data2[sample_data2 < -1.5] = -1.5
-    print('random_variance... ' + str(float(p['random_variance'])) + ' ' + str(np.max(np.abs(sample_data1))) + ' ' + str(np.max(np.abs(sample_data2))))
+#if(p.has_key('random_variance')):
+#    sample_data1 = sample_data1 + np.random.normal(0,float(p['random_variance']),sample_data1.shape)
+#    sample_data2 = sample_data2 + np.random.normal(0,float(p['random_variance']),sample_data2.shape)
+#    sample_data1 = np.asarray(sample_data1,np.float32)
+#    sample_data2 = np.asarray(sample_data2,np.float32)
+#    sample_data1[sample_data1 > 1.5] = 1.5
+#    sample_data1[sample_data1 < -1.5] = -1.5
+#    sample_data2[sample_data2 > 1.5] = 1.5
+#    sample_data2[sample_data2 < -1.5] = -1.5
+#    print('random_variance... ' + str(float(p['random_variance'])) + ' ' + str(np.max(np.abs(sample_data1))) + ' ' + str(np.max(np.abs(sample_data2))))
 
 #init net
 net = nnet.net(layers)

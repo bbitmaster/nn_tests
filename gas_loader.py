@@ -1,12 +1,13 @@
 import numpy as np
 import sys
+import gzip
 
 data_dir = '../data/'
-co_file = 'gas_data/ethylene_CO.txt'
-methane_file = 'gas_data/ethylene_methane.txt'
+co_file = 'gas_data/ethylene_CO.txt.gz'
+methane_file = 'gas_data/ethylene_methane.txt.gz'
 
 def load_gas_data(num_samples=1e99,correct=1.0,incorrect=-1.0):
-    co_f = open(data_dir + co_file)
+    co_f = gzip.open(data_dir + co_file)
     #skip header
     co_f.next()
     co_data = []
@@ -20,7 +21,7 @@ def load_gas_data(num_samples=1e99,correct=1.0,incorrect=-1.0):
             break
     co_f.close()
     
-    methane_f = open(data_dir + methane_file)
+    methane_f = gzip.open(data_dir + methane_file)
     methane_f.next()
     methane_data = []
     methane_sample_count=0

@@ -7,6 +7,8 @@ from autoconvert import autoconvert
 import sys
 import time
 
+from sklearn.lda import LDA
+
 #h5py used for saving results to a file
 import h5py
 
@@ -127,13 +129,27 @@ num_labels = len(P1_list)
 print("P1 Samples: " + str(np.sum(P1_mask)) + " P2 Samples: " + str(np.sum(P2_mask)))
 print("P2 Test Samples: " + str(np.sum(P1_test_mask)) + " P2 Test Samples: " + str(np.sum(P2_test_mask)))
 
-print("Doing PCA Reduction...")
-reduce_to = p['reduce_to']
+print("Doing LDA Reduction...")
+reduce_to = 9
+
+
+print(data_full.shape)
+print(class_data.shape)
+print(np.argmax(class_data,axis=1))
+
+lda = LDA(n_components=9)
+#lda = LDA(n_components=9,shrinkage='auto',solver='eigen')
+#data_reduced = lda.fit_transform(data_full,np.argmax(class_data,axis=1))
+lda = lda.fit(data_full,np.argmax(class_data,axis=1))
+data_reduced = lda.transform(data_full)
+test_data_reduced = lda.transform(test_data_full)
+
+print(data_reduced.shape)
 
 #pca reduce
-(pca_transform,data_means) = pca_reduce(data_full)
-data_reduced = np.dot(data_full,pca_transform[:,0:reduce_to])
-test_data_reduced = np.dot(test_data_full,pca_transform[:,0:reduce_to])
+#(pca_transform,data_means) = pca_reduce(data_full,class_data)
+#data_reduced = np.dot(data_full,pca_transform[:,0:reduce_to])
+#test_data_reduced = np.dot(test_data_full,pca_transform[:,0:reduce_to])
 
 print("Normalizing...")
 #we should normalize the pca reduced data
