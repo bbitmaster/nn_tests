@@ -43,7 +43,9 @@ def replace_centroids(net_layer,mask):
     replace_indices = neuron_used_indices[0:int(number_to_replace)]
     #replace indices gives indices for the neurons to replace
     samples_tmp = net_layer.input[:,mask]
+    print("samples_tmp shape: " + str(samples_tmp.shape))
     samples = samples_tmp[:,0:int(number_to_replace)]
+    print("samples shape: " + str(samples_tmp.shape))
 
     S = Shrink_Cov(samples_tmp)
     S_inv = np.linalg.inv(S[0])
