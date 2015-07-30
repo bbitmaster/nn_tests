@@ -10,6 +10,8 @@ import os
 import h5py as h5
 from sklearn import linear_model
 
+import matplotlib.pyplot as plt
+
 #Get the parameters file from the command line
 #use mnist_train__forget_params.py by default (no argument given)
 if(len(sys.argv) > 1):
@@ -70,6 +72,39 @@ num_centroids = p['num_centroids']
 
 select_indices = np.random.randint(60000,size=num_centroids);
 
+def plot_dictionary(num_rows,num_columns,data,data2,title=None,save_file=None):
+    tilegrid = np.zeros((28*num_rows,28*num_columns))
+    tilegrid2 = np.zeros((28*num_rows,28*num_columns))
+
+    for i in range(num_rows):
+        for j in range(num_columns):
+            index = i*num_columns + j
+            tile = np.reshape(data[0:784,index],(28,28))
+            tile = (tile - np.min(tile))/(np.max(tile) - np.min(tile))
+            tilegrid[i*28:(i*28+28),j*28:(j*28+28)] = tile
+
+    for i in range(num_rows):
+        for j in range(num_columns):
+            index = i*num_columns + j
+            tile = np.reshape(data2[0:784,index],(28,28))
+            tile = (tile - np.min(tile))/(np.max(tile) - np.min(tile))
+            tilegrid2[i*28:(i*28+28),j*28:(j*28+28)] = tile
+    #print(str(np.min(tilegrid)) + " " + str(np.max(tilegrid)))
+    plt.subplot(1,2,1)
+    plt.imshow(tilegrid,cmap='gray',interpolation='nearest')
+    plt.subplot(1,2,2)
+    plt.imshow(tilegrid2,cmap='gray',interpolation='nearest')
+    if(title is not None):
+        plt.suptitle(title);
+
+    if(save_file is None):
+        plt.show()
+    else:
+        f = plt.gcf()
+        f.set_size_inches(8.,10.)
+        plt.savefig(save_file,dpi=100,bbox_inches='tight')
+        plt.close()
+
 def do_kmeans(sample_data):
     #init clusters
     centroids = sample_data[select_indices,:]
@@ -112,9 +147,10 @@ if(p['load_centroids'] and os.path.exists(p['data_dir'] + 'mnist_initial_centroi
     print('centroid data loaded. Shape: ' + str(centroids.shape))
     f.close()
 else:
-    centroids = do_kmeans(sample_data);
+    if(p['cluster_func'] is not None):
+        centroids = do_kmeans(sample_data);
+        f['centroids'] = centroids
     f = h5.File(p['data_dir'] + 'mnist_initial_centroids_' + str(num_centroids) + '.h5py','w')
-    f['centroids'] = centroids
     f.close()
 
 #now we have a k-means clustered set of centroids.
@@ -123,7 +159,9 @@ else:
 if(p.has_key('nodes_per_group')):
     nodes_per_group=p['nodes_per_group']
 else:
-    nodes_per_group=p['num_hidden']
+    nodes_per_group=None
+
+rms_prop_rate = p.get('rms_prop_rate',None)
 
 layers = [];
 layers.append(nnet.layer(28*28))
@@ -133,12 +171,14 @@ layers.append(nnet.layer(num_centroids,p['activation_function'],
                          initialization_constant=p['initialization_constant'],
                          dropout=p['dropout'],sparse_penalty=p['sparse_penalty'],
                          sparse_target=p['sparse_target'],use_float32=p['use_float32'],
-                         momentum=p['momentum'],maxnorm=p['maxnorm'],step_size=p['learning_rate']))
+                         momentum=p['momentum'],maxnorm=p['maxnorm'],step_size=p['learning_rate']
+                         ,rms_prop_rate=rms_prop_rate))
 layers.append(nnet.layer(28*28,
                          initialization_scheme=p['initialization_scheme_final'],
                          initialization_constant=p['initialization_constant_final'],
                          use_float32=p['use_float32'],
-                         momentum=p['momentum_final'],step_size=p['learning_rate']))
+                         momentum=p['momentum_final'],step_size=p['learning_rate'],
+                         rms_prop_rate=rms_prop_rate))
 
 
 #feed mnist through the network
@@ -183,7 +223,6 @@ for i in range(training_epochs):
     for j in range(minibatch_count):
         #grab a minibatch
         net.input = np.transpose(sample_data[j*minibatch_size:(j+1)*minibatch_size])
-        tmp = np.transpose(sample_data[j*minibatch_size:(j+1)*minibatch_size])
         net.feed_forward()
         net.error = net.output - np.transpose(sample_data[j*minibatch_size:(j+1)*minibatch_size])
         train_mse = train_mse + np.sum(net.error**2)
@@ -202,9 +241,15 @@ for i in range(training_epochs):
     t = time.time()
     print("epoch " + str(i) + " mse " + str(train_mse) + " layer 0 weight norm: " + str(np.sum(net.layer[0].weights**2))+ " " + str(time_elapsed));
     mse_list.append(train_mse)
+    num_rows = 40
+    num_cols = 10
+    tmp = np.transpose(test_data[num_rows*num_cols:2*num_rows*num_cols])
+    net.input = tmp
+    net.feed_forward()
+    plot_dictionary(num_rows,num_cols,tmp,net.output,("Epoch: " + str(i) + " MNIST samples: MSE = " + str(train_mse)),"../result_images/" + str(p['simname']) + str(p['version']) + '.png')
 
     #compute logistic regression mse if we're done
-    if(i == training_epochs-1):
+    if(i == training_epochs-1 and p.has_key('do_log_reg') and p['do_log_reg']):
         net.input = np.transpose(sample_data)
         net.feed_forward()
 
