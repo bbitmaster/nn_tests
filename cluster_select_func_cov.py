@@ -78,9 +78,12 @@ def cluster_cov_select_func(self):
         #print("cov_mask sum: " + str(np.sum(cov_mask)))
         #print("centroids shape: " + str(self.centroids.shape))
         centroids_with_label = self.centroids[cov_mask,:]
+
         #print("centroids_with_label shape: " + str(centroids_with_label.shape))
-        distances_tmp = pairwise_distances(centroids_with_label,self.input.T,metric='mahalanobis',VI=self.S_list[i])
-        self.distances[cov_mask,:] = distances_tmp
+        #This prevents a bug where it crashes when no centroids belong to a label
+        if(centroids_with_label.shape[0] > 0):
+            distances_tmp = pairwise_distances(centroids_with_label,self.input.T,metric='mahalanobis',VI=self.S_list[i])
+            self.distances[cov_mask,:] = distances_tmp
         #print("distances shape: " + str(self.distances.shape))
         #print("input shape: " + str(self.input.shape))
     #print(str(self.distances))
