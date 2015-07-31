@@ -3,9 +3,9 @@ from nnet_toolkit import select_funcs as sf;
 
 #A handy name for this run. The data file will be given this name as
 #<resultsdir><simname><version>.h5py
-simname = 'mnist_train_nonstationary_rerun'
+simname = 'gas_train_nonstationary_rerun'
 version = '2.0'
-results_dir = '../gas_results_2015/'
+results_dir = '../gas_results_2015_lessnoise/'
 
 data_dir = '../data/'
 
@@ -22,12 +22,12 @@ num_samples = 600000
 random_variance=2.0
 
 num_hidden = 2048
-#num_hidden2 = 1024
+num_hidden2 = 2048
 #num_hidden3 = 2048
 
 nodes_per_group=8
 
-activation_function='maxout'
+activation_function='tanh'
 activation_function2='tanh'
 activation_function3='tanh'
 activation_function_final='softmax'

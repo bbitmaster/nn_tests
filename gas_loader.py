@@ -49,6 +49,8 @@ def load_gas_data(num_samples=1e99,correct=1.0,incorrect=-1.0):
     gas_data = gas_data - np.mean(gas_data,axis=0)
     gas_data = gas_data/np.std(gas_data,axis=0)
 
+    print("gas_data dims: " + str(gas_data.shape))
+
     return (gas_data,gas_class)
 
 if __name__ == '__main__':

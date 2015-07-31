@@ -20,6 +20,8 @@ threshold_cheat = True
 P1_list='L12349'
 P2_list='L56780'
 
+mnist_data_file='mnist_train_autoencoder_tanh_rms.h5py'
+
 num_hidden = 2048
 num_hidden2 = 2048
 #num_hidden3 = 2048
@@ -61,7 +63,7 @@ training_epochs = 3000
 #shuffle_rate = 300
 
 shuffle_type = 'no_improvement'
-shuffle_max_epochs = 100
+shuffle_max_epochs = 30
 
 var_alpha = 0.95
 error_difference_threshold = 2.5

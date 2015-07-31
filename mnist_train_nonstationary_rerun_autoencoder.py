@@ -97,12 +97,18 @@ print("Loading Data...")
 #get only first 4 digits
 #(data_full,class_data) = load_data(tuple(total_list),"training",p)
 #(test_data_full,test_class_data) = load_data(tuple(total_list),"testing",p)
-f= h5py.File(p['data_dir'] + 'mnist_train_autoencoder_tanh_rms.h5py')
+f= h5py.File(p['data_dir'] + p['mnist_data_file'])
 data_full = np.array(f['sample_data']).transpose()
 class_data = np.array(f['class_data'])
 test_data_full = np.array(f['test_data']).transpose()
 test_class_data = np.array(f['test_class'])
+
 f.close()
+
+class_data[class_data > 0.0] = p['correct_target']
+class_data[class_data < 0.0] = p['incorrect_target']
+test_class_data[test_class_data > 0.0] = p['correct_target']
+test_class_data[test_class_data < 0.0] = p['incorrect_target']
 
 train_size = data_full.shape[0]
 
