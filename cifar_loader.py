@@ -22,7 +22,7 @@ def load_batch(batch_fname):
     return d
 
 
-def load_cifar10(correct_target,incorrect_target):
+def load_cifar10(correct_target,incorrect_target,do_normalize=True):
     #5 batches
     full_data = []
     full_class = []
@@ -49,15 +49,16 @@ def load_cifar10(correct_target,incorrect_target):
     for i in range(test_class.shape[0]):
         test_class_onehot[i,test_class[i]] = correct_target;
 
-    #normalize data
-    data_mean = np.mean(full_data,axis=0)
-    data_std = np.std(full_data,axis=0)
+    if(do_normalize):
+        #normalize data
+        data_mean = np.mean(full_data,axis=0)
+        data_std = np.std(full_data,axis=0)
 
-    full_data = full_data - data_mean
-    full_data = full_data/data_std
+        full_data = full_data - data_mean
+        full_data = full_data/data_std
 
-    test_data = test_data - data_mean
-    test_data = test_data/data_std
+        test_data = test_data - data_mean
+        test_data = test_data/data_std
 
     #convert to float32
     full_data = full_data.astype(np.float32)
