@@ -304,7 +304,8 @@ if(p.has_key('cluster_func') and p['cluster_func'] is not None):
     net.layer[0].centroids = np.asarray(((np.ones((net.layer[0].weights.shape))*10.0)),np.float32)
     net.layer[0].select_func = csf.select_names[p['cluster_func']]
     print('cluster_func: ' + str(csf.select_names[p['cluster_func']]))
-    net.layer[0].centroid_speed = p['cluster_speed']
+    net.layer[0].centroid_speed = np.ones((net.layer[0].weights.shape[0]),dtype=np.float32)*p['cluster_speed']
+    net.layer[0].centroid_speed_decay = np.ones((net.layer[0].weights.shape[0]),dtype=np.float32)*p['cluster_speed_decay']
     net.layer[0].num_selected = p['clusters_selected']
     #covariance matrices
     net.layer[0].S_list = []
@@ -319,7 +320,8 @@ if(p.has_key('num_hidden2') and p.has_key('cluster_func2') and p['cluster_func2'
     net.layer[1].centroids = np.asarray(((np.ones((net.layer[1].weights.shape))*10.0)),np.float32)
     net.layer[1].select_func = csf.select_names[p['cluster_func2']]
     print('cluster_func: ' + str(csf.select_names[p['cluster_func2']]))
-    net.layer[1].centroid_speed = p['cluster_speed']
+    net.layer[1].centroid_speed = np.ones((net.layer[1].weights.shape[0]),dtype=np.float32)*p['cluster_speed']
+    net.layer[1].centroid_speed_decay = np.ones((net.layer[1].weights.shape[0]),dtype=np.float32)*p['cluster_speed_decay']
     net.layer[1].num_selected = p['clusters_selected']
     net.layer[1].cov_to_use = np.zeros(net.layer[1].weights.shape[1])
     #covariance matrices
@@ -334,6 +336,8 @@ if(p.has_key('num_hidden3') and p.has_key('cluster_func3') and p['cluster_func3'
     net.layer[2].centroids = np.asarray(((np.ones((net.layer[2].weights.shape))*10.0)),np.float32)
     net.layer[2].select_func = csf.select_names[p['cluster_func3']]
     print('cluster_func: ' + str(csf.select_names[p['cluster_func3']]))
+    net.layer[2].centroid_speed = np.ones((net.layer[2].weights.shape[0]),dtype=np.float32)*p['cluster_speed']
+    net.layer[2].centroid_speed_decay = np.ones((net.layer[2].weights.shape[0]),dtype=np.float32)*p['cluster_speed_decay']
     net.layer[2].centroid_speed = p['cluster_speed']
     net.layer[2].num_selected = p['clusters_selected']
     net.layer[2].cov_to_use = np.zeros(net.layer[2].weights.shape[1])

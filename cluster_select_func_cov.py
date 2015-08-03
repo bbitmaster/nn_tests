@@ -43,7 +43,18 @@ def cluster_select_func(self):
 
 def cluster_update_func(self):
     alpha = self.centroid_speed    
-    self.centroids = self.centroids + alpha*(self.centroids_prime - self.centroids)
+    if(type(alpha) == np.ndarray):
+        self.centroids = self.centroids + alpha[:,np.newaxis]*(self.centroids_prime - self.centroids)
+        self.centroid_speed = self.centroid_speed*(1.0 - (1.0 - self.centroid_speed_decay)*np.sum(~self.saved_selected_neurons,axis=1))
+
+    else:
+        self.centroids = self.centroids + alpha*(self.centroids_prime - self.centroids)
+    #print("centroids shape" + str(self.centroids.shape))
+    #print("centroids_prime shape" + str(self.centroids_prime.shape))
+    #print("selected neurons shape" + str(self.saved_selected_neurons.shape))
+    #print("selected neuron count: " + str(np.sum(~self.saved_selected_neurons,axis=1)))
+    #print("centroid speed decay: " + str(self.centroid_speed))
+    #print("centroid speed decay: " + str(np.min(self.centroid_speed)))
     
     #keep a count of the number of times a centroid was selected
     self.selected_count = self.selected_count + np.sum(~self.saved_selected_neurons,1)
@@ -120,7 +131,18 @@ def cluster_cov_select_func(self):
 
 def cluster_cov_update_func(self):
     alpha = self.centroid_speed    
-    self.centroids = self.centroids + alpha*(self.centroids_prime - self.centroids)
+    if(type(alpha) == np.ndarray):
+        self.centroids = self.centroids + alpha[:,np.newaxis]*(self.centroids_prime - self.centroids)
+        self.centroid_speed = self.centroid_speed*(1.0 - (1.0 - self.centroid_speed_decay)*np.sum(~self.saved_selected_neurons,axis=1))
+
+    else:
+        self.centroids = self.centroids + alpha*(self.centroids_prime - self.centroids)
+    #print("centroids shape" + str(self.centroids.shape))
+    #print("centroids_prime shape" + str(self.centroids_prime.shape))
+    #print("selected neurons shape" + str(self.saved_selected_neurons.shape))
+    #print("selected neuron count: " + str(np.sum(~self.saved_selected_neurons,axis=1)))
+    #print("centroid speed decay: " + str(self.centroid_speed))
+    #print("centroid speed decay: " + str(np.min(self.centroid_speed)))
     
     #keep a count of the number of times a centroid was selected
     self.selected_count = self.selected_count + np.sum(~self.saved_selected_neurons,1)
@@ -128,6 +150,7 @@ def cluster_cov_update_func(self):
     self.eligibility_count = self.eligibility_count*0.99
     #print("selected: " + str(self.selected_count))
     #print("eligibility: " + str(self.eligibility_count))
+
 
 
 select_names = {}
